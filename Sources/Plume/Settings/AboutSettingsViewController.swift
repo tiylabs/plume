@@ -28,6 +28,7 @@ final class AboutSettingsViewController: NSViewController {
 
     private static let releasesPage = UpdateChecker.releasesPage
     private static let repository = URL(string: "https://github.com/tiylabs/plume")!
+    private static let licenseFile = URL(string: "https://github.com/tiylabs/plume/blob/master/LICENSE")!
 
     /// Hands each answer to the same place the summon check's goes, so the menu bar item and the
     /// icon's dot light from a press here too.
@@ -100,6 +101,7 @@ final class AboutSettingsViewController: NSViewController {
         form.card([
             linkRow(tr("about.github"), to: Self.repository),
             linkRow(tr("about.releases"), to: Self.releasesPage),
+            linkRow(tr("about.license"), to: Self.licenseFile),
         ])
         view = form.makeContentView()
     }

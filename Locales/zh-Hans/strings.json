@@ -165,6 +165,7 @@
   "about.check": "检查更新",
   "about.github": "GitHub",
   "about.releases": "发布页",
+  "about.license": "许可证",
   "about.checking": "正在检查…",
   "about.available": "{version} 已发布",
   "about.upToDate": "Plume 已是最新版本",

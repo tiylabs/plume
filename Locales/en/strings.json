@@ -166,6 +166,7 @@
   "about.check": "Check for Updates",
   "about.github": "GitHub",
   "about.releases": "Releases",
+  "about.license": "License",
   "about.checking": "Checking…",
   "about.available": "{version} is available",
   "about.upToDate": "Plume is up to date",
