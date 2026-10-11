@@ -12,6 +12,20 @@ enum Check {
     nonisolated(unsafe) private static var failures: [String] = []
     nonisolated(unsafe) private static var assertions = 0
     nonisolated(unsafe) private static var tests = 0
+    nonisolated(unsafe) private static var seen = 0
+
+    /// `PLUME_TEST_SHARD=k/n` runs every n-th test, starting at the k-th. Nearly all of the suite's
+    /// time is spent waiting on git subprocesses, so `Scripts/test.sh` runs several shards at once
+    /// instead of one test after another. Tests are dealt out round-robin rather than by suite, so
+    /// a suite of slow neighbours spreads across the shards instead of landing on one.
+    private static let shard: (index: Int, count: Int)? = {
+        guard let raw = ProcessInfo.processInfo.environment["PLUME_TEST_SHARD"] else { return nil }
+        let parts = raw.split(separator: "/").compactMap { Int($0) }
+        guard parts.count == 2, parts[1] > 0, (0..<parts[1]).contains(parts[0]) else {
+            fatalError("PLUME_TEST_SHARD must look like 0/4, got \(raw)")
+        }
+        return (parts[0], parts[1])
+    }()
 
     static func suite(_ name: String, _ body: () -> Void) {
         suiteName = name
@@ -20,6 +34,8 @@ enum Check {
     }
 
     static func test(_ name: String, _ body: () -> Void) {
+        defer { seen += 1 }
+        if let shard, seen % shard.count != shard.index { return }
         testName = name
         tests += 1
         body()
