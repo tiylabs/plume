@@ -25,6 +25,15 @@ final class MenuBarController: NSObject {
     /// Supplies the pinned notes as (filename, title) pairs, most recently used first.
     var pinnedNotes: () -> [(filename: String, title: String)] = { [] }
 
+    /// *Sync Now*.
+    var onSyncNow: (() -> Void)?
+    /// A conflicted file was chosen from the menu.
+    var onOpenConflict: ((String) -> Void)?
+    /// The sync failure line was chosen — the Storage tab says more than a menu line can.
+    var onOpenSyncSettings: (() -> Void)?
+    /// The note title for a filename, for the conflict list; nil when it is not a note Plume knows.
+    var noteTitle: (String) -> String? = { _ in nil }
+
     init(hotkey: Hotkey) {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
@@ -89,8 +98,73 @@ final class MenuBarController: NSObject {
     func setUpdateAvailable(_ version: String?) {
         guard version != updateAvailable else { return }
         updateAvailable = version
-        item.button?.image = version == nil ? Self.statusImage : Self.badgedStatusImage
+        refreshIcon()
         rebuild(hotkey: hotkey)
+    }
+
+    // MARK: - Sync
+
+    private var syncStatus: GitSyncStatus?
+    private var animationTimer: Timer?
+    private var animationFrame = 0
+
+    /// Tells the item how Git sync is doing, or that there is none (`nil`).
+    ///
+    /// The icon is a function of this and of `updateAvailable`, never of an event: a red dot means
+    /// *the sync is failing now*, and goes when the next cycle succeeds, with no one having to
+    /// dismiss it.
+    func setSyncStatus(_ status: GitSyncStatus?) {
+        guard status != syncStatus else { return }
+        syncStatus = status
+        refreshIcon()
+        rebuild(hotkey: hotkey)
+    }
+
+    private func refreshIcon() {
+        let syncing = syncStatus?.isSyncing == true
+        if syncing { startAnimating() } else { stopAnimating() }
+        renderIcon()
+    }
+
+    private var currentDot: MenuBarDot {
+        MenuBarDot.resolve(sync: syncStatus, updateAvailable: updateAvailable != nil)
+    }
+
+    private func renderIcon() {
+        let dot = currentDot
+        let syncing = syncStatus?.isSyncing == true
+        guard dot != .none || syncing else {
+            item.button?.image = Self.statusImage
+            return
+        }
+        // Reduce Motion gets the arrows without the movement.
+        let phase = syncing
+            ? (NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+                ? 0.5 : Double(animationFrame % Self.animationFrames) / Double(Self.animationFrames))
+            : nil
+        item.button?.image = Self.composedImage(dot: dot, arrowPhase: phase)
+    }
+
+    private static let animationFrames = 10
+
+    private func startAnimating() {
+        guard animationTimer == nil else { return }
+        animationFrame = 0
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        let timer = Timer(timeInterval: 0.09, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.animationFrame += 1
+                self.renderIcon()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        animationTimer = timer
+    }
+
+    private func stopAnimating() {
+        animationTimer?.invalidate()
+        animationTimer = nil
     }
 
     func rebuild(hotkey: Hotkey) {
@@ -144,6 +218,8 @@ final class MenuBarController: NSObject {
             }
         }
 
+        addSyncItems()
+
         menu.addItem(.separator())
         // Above Settings, and only while there is one. This is the durable half of decision 136:
         // the toast comes and goes once a day, and this waits — in the app-level surface, because
@@ -163,6 +239,70 @@ final class MenuBarController: NSObject {
         let quit = NSMenuItem(title: tr("menu.quit"), action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
+    }
+
+    /// The sync section: one line of state, the conflicted notes if there are any, and *Sync Now*.
+    /// Absent entirely while Git sync is off, so a menu that has never heard of it is unchanged.
+    private func addSyncItems() {
+        guard let status = syncStatus else { return }
+        menu.addItem(.separator())
+
+        func line(_ title: String, symbol: String? = nil, tint: NSColor? = nil,
+                  action: Selector? = nil, tooltip: String? = nil) -> NSMenuItem {
+            let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            if action != nil { entry.target = self } else { entry.isEnabled = false }
+            entry.toolTip = tooltip
+            if let symbol {
+                let configuration = tint.map { NSImage.SymbolConfiguration(paletteColors: [$0]) }
+                let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+                    .withSymbolConfiguration(configuration ?? .init())
+                image?.isTemplate = tint == nil
+                entry.image = image
+            }
+            return entry
+        }
+
+        switch status {
+        case .syncing:
+            menu.addItem(line(tr("menubar.sync.syncing")))
+
+        case .idle(let last):
+            menu.addItem(line(
+                last.map { tr("menubar.sync.last", ["time": GitSyncWording.relative($0)]) }
+                    ?? tr("menubar.sync.never")
+            ))
+
+        case .conflicts(let files):
+            menu.addItem(line(
+                L10n.plural("menubar.sync.conflicts", count: files.count),
+                symbol: "exclamationmark.triangle.fill", tint: .systemYellow
+            ))
+            for file in files.prefix(5) {
+                let title = noteTitle(file).flatMap { $0.isEmpty ? nil : $0 } ?? file
+                let entry = line(title, action: #selector(openConflict(_:)))
+                entry.representedObject = file
+                entry.indentationLevel = 1
+                menu.addItem(entry)
+            }
+            if files.count > 5 {
+                let more = line("…")
+                more.indentationLevel = 1
+                menu.addItem(more)
+            }
+
+        case .failed(let failure):
+            let message = failure.message
+            let shown = message.count > 64 ? String(message.prefix(63)) + "…" : message
+            menu.addItem(line(
+                tr("menubar.sync.failed", ["message": shown]),
+                symbol: "exclamationmark.circle.fill", tint: .systemRed,
+                action: #selector(openSyncSettings), tooltip: message
+            ))
+        }
+
+        let now = line(tr("menubar.sync.now"), action: #selector(syncNow))
+        now.isEnabled = !status.isSyncing
+        menu.addItem(now)
     }
 
     private func action(_ title: String, key: String, selector: Selector) -> NSMenuItem {
@@ -256,6 +396,96 @@ final class MenuBarController: NSObject {
         return image
     }()
 
+    /// The glyph wearing whatever the sync is saying: a coloured dot for a conflict (yellow) or a
+    /// failure (red), the monochrome update dot, and up-and-down arrows while a cycle runs.
+    ///
+    /// **A coloured dot costs the template.** A template image is drawn in the menu bar's own ink and
+    /// that is what keeps the icon right on a dark bar, a light one and a highlighted item; a colour
+    /// cannot be part of one. So when the dot is coloured the image is not a template, and the glyph
+    /// is painted in `labelColor` *inside the drawing handler* — resolved when the menu bar draws it,
+    /// under the menu bar's appearance, rather than baked in now. Without a coloured dot the image
+    /// stays a template and everything in it is plain black.
+    ///
+    /// The size never changes, arrows included: a status item that widened for two seconds every five
+    /// minutes would shove its neighbours along with it.
+    private static func composedImage(dot: MenuBarDot, arrowPhase: Double?) -> NSImage? {
+        guard let base = statusImage else { return nil }
+        let size = base.size
+        let coloured = dot == .conflict || dot == .failure
+
+        let image = NSImage(size: size, flipped: false) { rect in
+            base.draw(in: rect)
+            if coloured {
+                NSColor.labelColor.set()
+                rect.fill(using: .sourceAtop)
+            }
+            let ink: NSColor = coloured ? .labelColor : .black
+
+            if let phase = arrowPhase {
+                let box = NSRect(x: size.width - 11, y: 0, width: 11, height: 11)
+                NSGraphicsContext.current?.compositingOperation = .destinationOut
+                NSBezierPath(roundedRect: box.insetBy(dx: -1.2, dy: -1.2), xRadius: 3, yRadius: 3).fill()
+                NSGraphicsContext.current?.compositingOperation = .sourceOver
+                drawArrows(in: box, phase: phase, ink: ink)
+            }
+
+            if dot != .none {
+                let diameter = (size.height * (coloured ? 0.40 : 0.34)).rounded()
+                let gap = max(1, (diameter * 0.34).rounded())
+                let spot = NSRect(
+                    x: size.width - diameter, y: size.height - diameter,
+                    width: diameter, height: diameter
+                )
+                NSGraphicsContext.current?.compositingOperation = .destinationOut
+                NSBezierPath(ovalIn: spot.insetBy(dx: -gap, dy: -gap)).fill()
+                NSGraphicsContext.current?.compositingOperation = .sourceOver
+                switch dot {
+                case .failure: NSColor.systemRed.setFill()
+                case .conflict: NSColor.systemYellow.setFill()
+                default: NSColor.black.setFill()
+                }
+                NSBezierPath(ovalIn: spot).fill()
+            }
+            return true
+        }
+        image.isTemplate = !coloured
+        image.accessibilityDescription = {
+            switch dot {
+            case .failure: return tr("menubar.a11y.failed")
+            case .conflict: return tr("menubar.a11y.conflict")
+            default: return arrowPhase != nil ? tr("menubar.a11y.syncing") : tr("menubar.updateAvailable")
+            }
+        }()
+        return image
+    }
+
+    /// An up arrow and a down arrow side by side, drifting in opposite directions and trading
+    /// brightness, so the pair reads as traffic both ways.
+    private static func drawArrows(in box: NSRect, phase: Double, ink: NSColor) {
+        func arrow(centerX: CGFloat, up: Bool, phase: Double) {
+            let travel = CGFloat(phase) * 2 - 1                     // -1 → +1 across the cycle
+            let shift = up ? travel : -travel
+            let alpha = 0.45 + 0.55 * sin(.pi * phase)
+            let top = box.maxY - 1.5, bottom = box.minY + 1.5
+            let tip = up ? top : bottom, tail = up ? bottom : top
+            let wing: CGFloat = 2.3 * (up ? -1 : 1)
+
+            let path = NSBezierPath()
+            path.lineWidth = 1.3
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            path.move(to: NSPoint(x: centerX, y: tail + shift))
+            path.line(to: NSPoint(x: centerX, y: tip + shift))
+            path.move(to: NSPoint(x: centerX - 2.3, y: tip + shift + wing))
+            path.line(to: NSPoint(x: centerX, y: tip + shift))
+            path.line(to: NSPoint(x: centerX + 2.3, y: tip + shift + wing))
+            ink.withAlphaComponent(alpha).setStroke()
+            path.stroke()
+        }
+        arrow(centerX: box.minX + 3, up: true, phase: phase)
+        arrow(centerX: box.maxX - 3, up: false, phase: (phase + 0.5).truncatingRemainder(dividingBy: 1))
+    }
+
     private static let pinImage: NSImage? = {
         let image = NSImage(systemSymbolName: "pin.fill", accessibilityDescription: nil)
         image?.isTemplate = true
@@ -273,6 +503,13 @@ final class MenuBarController: NSObject {
     @objc private func openRelease() {
         guard let version = updateAvailable else { return }
         onOpenRelease?(version)
+    }
+
+    @objc private func syncNow() { onSyncNow?() }
+    @objc private func openSyncSettings() { onOpenSyncSettings?() }
+    @objc private func openConflict(_ sender: NSMenuItem) {
+        guard let file = sender.representedObject as? String else { return }
+        onOpenConflict?(file)
     }
 
     @objc private func openPinned(_ sender: NSMenuItem) {

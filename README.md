@@ -42,10 +42,14 @@ and drag `Plume.app` into `Applications`. Releases are signed and notarized by A
 - **One panel.** <kbd>⌘P</kbd> switches notes (fuzzy and full-text search), <kbd>⌘K</kbd> opens actions.
 - **Plain files.** Notes are `.md` files in a folder you choose (`~/Documents/Plume` by default).
   External edits are picked up; conflicts are saved to a separate file, never overwritten.
-- **Sync.** Pick iCloud Drive under Settings › Storage, or any folder your own sync tool manages.
+- **Sync.** Pick iCloud Drive under Settings › Storage, any folder your own sync tool manages, or a
+  Git repository. Git sync uses the `git` on your Mac and your own SSH keys or saved credentials; every
+  5 minutes it merges in what changed on the remote and commits and pushes what changed here. When both
+  sides edited a note, Git's conflict markers are left in it, a yellow dot appears on the menu bar icon,
+  and syncing resumes once you remove them. A failed sync shows a red dot.
 - **Themes.** A theme is a CSS file in `~/Library/Application Support/Plume/Themes`.
-- **Private.** No permissions requested, no telemetry. The only network call is an update check
-  against GitHub, which can be turned off in Settings.
+- **Private.** No permissions requested, no telemetry. The only network calls are an update check
+  against GitHub, which can be turned off in Settings, and Git sync, which is off until you set it up.
 
 <kbd>⌘,</kbd> opens Settings. They are stored in `settings.json`, which Plume re-reads live.
 

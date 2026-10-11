@@ -80,18 +80,22 @@ final class SettingsForm {
     }
 
     /// A note under the card above it. Pulled up close so it reads as that card's, not as a row.
-    func footnote(_ text: String) {
+    @discardableResult
+    func footnote(_ text: String) -> NSView {
         if let last = stack.arrangedSubviews.last {
             stack.setCustomSpacing(Self.captionGap, after: last)
         }
         let label = NSTextField(wrappingLabelWithString: text)
         label.font = Self.explanationFont
         label.textColor = .secondaryLabelColor
-        add(Self.caption(label))
+        let caption = Self.caption(label)
+        add(caption)
+        return caption
     }
 
     /// A control right-aligned to the card edge — the Restore Defaults button.
-    func trailing(_ control: NSView) {
+    @discardableResult
+    func trailing(_ control: NSView) -> NSView {
         let wrap = NSView()
         control.translatesAutoresizingMaskIntoConstraints = false
         wrap.addSubview(control)
@@ -101,6 +105,7 @@ final class SettingsForm {
             control.trailingAnchor.constraint(equalTo: wrap.trailingAnchor),
         ])
         add(wrap)
+        return wrap
     }
 
     /// Any other full-width block — the About tab's centred header. It is given the card width so its
@@ -302,8 +307,12 @@ final class SettingsRow: NSView {
     /// explain is not reserving space for the moment it might.
     let explanationLabel: NSTextField
 
+    /// The row's title, for the one row that changes its mind about what it is called.
+    let titleLabel: NSTextField
+
     init(title: String, explanation: String? = nil, control: NSView? = nil) {
         let titleLabel = NSTextField(labelWithString: title)
+        self.titleLabel = titleLabel
         titleLabel.font = SettingsForm.titleFont
         titleLabel.lineBreakMode = .byTruncatingTail
 
@@ -372,6 +381,7 @@ final class SettingsRow: NSView {
     /// A row that is one view end to end, for content that is not a title and a control.
     init(content: NSView) {
         explanationLabel = NSTextField(labelWithString: "")
+        titleLabel = NSTextField(labelWithString: "")
         super.init(frame: .zero)
         embed(content)
     }

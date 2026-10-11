@@ -39,6 +39,10 @@ public struct Settings: Codable, Equatable, Sendable {
 
     public static let recentlyDeletedOptions = [7, 30, 90]
 
+    /// Syncing the notes folder through a Git remote. Off by default, and while it is off Plume makes
+    /// no network request on its behalf — the only one it ever makes is the update check.
+    public var gitSync: GitSyncSettings
+
     // MARK: Hotkey
 
     public var summonHotkey: Hotkey
@@ -390,6 +394,7 @@ public struct Settings: Codable, Equatable, Sendable {
         schemaVersion: Int = Settings.currentSchemaVersion,
         vaultPath: String = Settings.defaultVaultPath,
         recentlyDeletedDays: Int = 30,
+        gitSync: GitSyncSettings = GitSyncSettings(),
         summonHotkey: Hotkey = BuildProfile.current.defaultSummonHotkey,
         dismissMode: DismissMode = .sameHotkeyToggles,
         shortcuts: [String: String] = Settings.standardShortcuts,
@@ -412,6 +417,7 @@ public struct Settings: Codable, Equatable, Sendable {
         self.schemaVersion = schemaVersion
         self.vaultPath = vaultPath
         self.recentlyDeletedDays = recentlyDeletedDays
+        self.gitSync = gitSync
         self.summonHotkey = summonHotkey
         self.dismissMode = dismissMode
         self.shortcuts = shortcuts
@@ -442,6 +448,8 @@ public struct Settings: Codable, Equatable, Sendable {
         vaultPath = try c.decodeIfPresent(String.self, forKey: .vaultPath) ?? d.vaultPath
         recentlyDeletedDays =
             try c.decodeIfPresent(Int.self, forKey: .recentlyDeletedDays) ?? d.recentlyDeletedDays
+        // A malformed `gitSync` block costs the sync setting, not the file.
+        gitSync = (try? c.decodeIfPresent(GitSyncSettings.self, forKey: .gitSync)) ?? d.gitSync
         summonHotkey = try c.decodeIfPresent(Hotkey.self, forKey: .summonHotkey) ?? d.summonHotkey
         dismissMode = try c.decodeIfPresent(DismissMode.self, forKey: .dismissMode) ?? d.dismissMode
         // Merged over the standards rather than replacing them, so a file that names one shortcut

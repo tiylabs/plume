@@ -3,12 +3,17 @@ import PlumeKit
 
 /// Design frame 3a — the Storage tab.
 ///
-/// Decision 21 is the load-bearing part: **the Sync radio picks where the vault lives, not a
-/// protocol.** Off, iCloud Drive and the dimmed Peer-to-peer are all folder locations, and decision 7
-/// survives intact — no server, no account, no sync code ships behind any of them. The radio exists
-/// so that a future engine is one more row rather than a redesign.
+/// Decision 21 is the load-bearing part: **Off and iCloud Drive pick where the vault lives, not a
+/// protocol.** Both are folder locations, and no server, account or sync code stands behind either.
 ///
-/// Which means selecting a row has to actually move the vault, and that is the one genuinely
+/// **Git repository is the exception, and the first row with an engine behind it.** It does not move
+/// the vault: the notes folder *becomes* the working tree and `origin` is the address typed here (see
+/// `GitSyncEngine`). That is a reversal of decision 7's "no sync code ships", made deliberately and
+/// guarded three ways: it is off until someone verifies an address and presses *Enable Sync*, it
+/// holds no credentials of its own (the system `git` and its keys do the authenticating), and it
+/// refuses to start inside iCloud Drive, which would sync `.git` out from under itself.
+///
+/// Selecting an iCloud row still has to actually move the vault, and that is the one genuinely
 /// destructive thing in this window. It goes through a confirmation that names both paths and says
 /// what happens to the notes, in the same posture as decision 27: at a filesystem moment, use the
 /// system's own chrome and tell the truth.
@@ -24,9 +29,41 @@ final class StorageSettingsViewController: NSViewController {
     /// still knows where it lives. See `adopt`.
     var onWillMoveNotes: (() -> Void)?
 
+    /// Called for *Sync Now*.
+    var onSyncNow: (() -> Void)?
+
+    /// Called with the height this tab needs whenever it changes — which is when the Git rows appear
+    /// or a longer verification result arrives. The window is one size for every tab (see
+    /// `SettingsWindowController`), so this tab asks it to grow rather than being clipped.
+    var onContentHeightChanged: ((CGFloat) -> Void)?
+    private var reportedHeight: CGFloat = 0
+
     private var pathField: NSTextField!
     private var syncPopUp: NSPopUpButton!
     private var syncRow: SettingsRow!
+
+    // Git
+    private var gitConfigCard: SettingsCard!
+    private var gitInfoCard: SettingsCard!
+    private var gitActions: NSView!
+    private var addressField: NSTextField!
+    private var branchField: NSTextField!
+    private var infoRow: SettingsRow!
+    private var verifyButton: NSButton!
+    private var statusValue: NSTextField!
+    private var enableButton: NSButton!
+    private var syncNowButton: NSButton!
+    private var stopButton: NSButton!
+
+    /// The popup says Git although sync is not enabled yet — the person is filling in the address.
+    /// Not persisted: until *Enable Sync*, choosing Git changes nothing about where the notes are.
+    private var gitChosen = false
+    private var verifying = false
+    private var verificationText = ""
+    /// What the last passing verification was for. Editing either field makes it stale, and *Enable
+    /// Sync* needs it to match what is in the fields now.
+    private var verifiedKey: String?
+    private var syncStatus: GitSyncStatus?
 
     init(settings: SettingsStore) {
         self.settings = settings
@@ -74,16 +111,54 @@ final class StorageSettingsViewController: NSViewController {
         ])
 
         // ---- sync --------------------------------------------------------------------------
-        // A pop-up row, not a radio group: three mutually exclusive locations is one choice, and it
-        // keeps this card the same shape as every other. The dimmed third item is "coming".
+        // A pop-up row, not a radio group: the choices are mutually exclusive and it keeps this card
+        // the same shape as every other.
         syncPopUp = SettingsForm.popUp(
-            [tr("storage.sync.off"), tr("storage.sync.icloud"), tr("storage.sync.peer")],
+            [tr("storage.sync.off"), tr("storage.sync.icloud"), tr("storage.sync.git")],
             target: self,
             action: #selector(syncChanged)
         )
-        syncPopUp.autoenablesItems = false
-        syncPopUp.item(at: 2)?.isEnabled = false
         syncRow = SettingsRow(title: tr("storage.sync"), control: syncPopUp)
+        form.card([syncRow])
+
+        // ---- git ---------------------------------------------------------------------------
+        addressField = Self.textField(
+            current.gitSync.remoteURL, placeholder: tr("storage.git.address.placeholder"), width: 250, owner: self
+        )
+        branchField = Self.textField(
+            current.gitSync.branch, placeholder: tr("storage.git.branch.placeholder"), width: 150, owner: self
+        )
+        gitConfigCard = form.card([
+            SettingsRow(title: tr("storage.git.address"), control: addressField),
+            SettingsRow(title: tr("storage.git.branch"), control: branchField),
+        ])
+
+        verifyButton = SettingsForm.push(tr("storage.git.verify"), target: self, action: #selector(verify))
+        statusValue = SettingsForm.value("")
+        statusValue.lineBreakMode = .byTruncatingTail
+        let infoControl = NSStackView(views: [verifyButton, statusValue])
+        infoRow = SettingsRow(title: tr("storage.git.connection"), control: infoControl)
+        gitInfoCard = form.card([infoRow])
+
+        enableButton = SettingsForm.push(tr("storage.git.enable"), target: self, action: #selector(enableSync))
+        enableButton.keyEquivalent = "\r"
+        syncNowButton = SettingsForm.push(tr("storage.git.syncNow"), target: self, action: #selector(syncNowTapped))
+        stopButton = SettingsForm.push(tr("storage.git.stop"), target: self, action: #selector(stopSync))
+        // The explanation of how sync behaves lives in a tooltip on this glyph rather than in a
+        // paragraph under the buttons: it is read once, and a paragraph is read every time.
+        let info = NSImageView(
+            image: NSImage(systemSymbolName: "info.circle", accessibilityDescription: tr("storage.git.info"))
+                ?? NSImage()
+        )
+        info.contentTintColor = .secondaryLabelColor
+        info.toolTip = tr("storage.git.footnote")
+        info.setAccessibilityLabel(tr("storage.git.info"))
+        info.setAccessibilityHelp(tr("storage.git.footnote"))
+
+        let buttons = NSStackView(views: [info, syncNowButton, stopButton, enableButton])
+        buttons.orientation = .horizontal
+        buttons.spacing = 8
+        gitActions = form.trailing(buttons)
 
         // ---- recently deleted --------------------------------------------------------------
         let retention = SettingsForm.popUp(
@@ -96,12 +171,39 @@ final class StorageSettingsViewController: NSViewController {
         )
 
         form.card([
-            syncRow,
             SettingsRow(title: tr("storage.recentlyDeleted"), control: retention),
         ])
 
         view = form.makeContentView()
         refresh(current)
+    }
+
+    // MARK: - Keeping "last synced" honest
+
+    private var clock: Timer?
+
+    /// "Last synced 3 minutes ago" is text computed from a date, and the date does not change between
+    /// cycles — so with nothing else to prompt a redraw it said "now" for as long as the tab stayed
+    /// open. A slow tick re-reads it while the tab is on screen, and stops when it is not.
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        refreshGit(settings.value)
+        clock?.invalidate()
+        let timer = Timer(timeInterval: 15, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.settings.value.gitSync.enabled else { return }
+                self.refreshGit(self.settings.value)
+            }
+        }
+        timer.tolerance = 5
+        RunLoop.main.add(timer, forMode: .common)
+        clock = timer
+    }
+
+    override func viewDidDisappear() {
+        super.viewDidDisappear()
+        clock?.invalidate()
+        clock = nil
     }
 
     func settingsChanged(_ new: Settings) {
@@ -111,10 +213,165 @@ final class StorageSettingsViewController: NSViewController {
     private func refresh(_ current: Settings) {
         pathField?.stringValue = current.vaultPath
         let iCloud = Self.isInICloudDrive(current.vaultURL)
-        syncPopUp?.selectItem(at: iCloud ? 1 : 0)
+        let git = current.gitSync.enabled || gitChosen
+        syncPopUp?.selectItem(at: git ? 2 : (iCloud ? 1 : 0))
         // The explanation only exists while there is something to say; hidden, it takes no height.
-        syncRow?.explanationLabel.stringValue = iCloud ? tr("storage.syncedNote") : ""
-        syncRow?.explanationLabel.isHidden = !iCloud
+        syncRow?.explanationLabel.stringValue = iCloud && !git ? tr("storage.syncedNote") : ""
+        syncRow?.explanationLabel.isHidden = !(iCloud && !git)
+        refreshGit(current)
+    }
+
+    private func refreshGit(_ current: Settings) {
+        guard gitConfigCard != nil else { return }
+        let shown = current.gitSync.enabled || gitChosen
+        let enabled = current.gitSync.enabled
+        [gitConfigCard, gitInfoCard, gitActions].forEach { $0?.isHidden = !shown }
+
+        if enabled {
+            addressField.stringValue = current.gitSync.remoteURL
+            branchField.stringValue = current.gitSync.branch
+        }
+        // Fixed while sync runs: changing the address of a live sync is stopping it and starting
+        // another, and the buttons below say so.
+        addressField.isEnabled = !enabled
+        branchField.isEnabled = !enabled
+
+        verifyButton.isHidden = enabled
+        verifyButton.isEnabled = !verifying
+        verifyButton.title = verifying ? tr("storage.git.verifying") : tr("storage.git.verify")
+        statusValue.isHidden = !enabled
+        infoRow.titleLabel.stringValue = enabled ? tr("storage.git.status") : tr("storage.git.connection")
+
+        let detail: String
+        if enabled {
+            let status = syncStatus ?? .idle(lastSync: nil)
+            statusValue.stringValue = GitSyncWording.headline(status)
+            detail = GitSyncWording.detail(status)
+        } else {
+            detail = verificationText.isEmpty ? tr("storage.git.verify.hint") : verificationText
+        }
+        infoRow.explanationLabel.stringValue = detail
+        infoRow.explanationLabel.isHidden = detail.isEmpty
+
+        enableButton.isHidden = enabled
+        enableButton.isEnabled = !verifying && verifiedKey != nil && verifiedKey == currentKey
+        syncNowButton.isHidden = !enabled
+        syncNowButton.isEnabled = syncStatus?.isSyncing != true
+        stopButton.isHidden = !enabled
+
+        view.layoutSubtreeIfNeeded()
+        let height = view.fittingSize.height
+        if abs(height - reportedHeight) > 0.5 {
+            reportedHeight = height
+            onContentHeightChanged?(height)
+        }
+    }
+
+    /// Pushed in by the app whenever the sync's status changes.
+    func syncStatusChanged(_ status: GitSyncStatus?) {
+        syncStatus = status
+        refreshGit(settings.value)
+    }
+
+    // MARK: - Git
+
+    private static func textField(
+        _ value: String, placeholder: String, width: CGFloat, owner: NSTextFieldDelegate
+    ) -> NSTextField {
+        let field = NSTextField(string: value)
+        field.placeholderString = placeholder
+        field.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
+        field.lineBreakMode = .byTruncatingMiddle
+        field.usesSingleLineMode = true
+        field.cell?.isScrollable = true
+        field.delegate = owner
+        field.widthAnchor.constraint(equalToConstant: width).isActive = true
+        return field
+    }
+
+    private var currentAddress: String { addressField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var currentBranch: String { branchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var currentKey: String { currentAddress + "\n" + currentBranch }
+
+    @objc private func verify() {
+        guard !verifying else { return }
+        let address = currentAddress, branch = currentBranch
+        let key = currentKey
+        verifying = true
+        verifiedKey = nil
+        verificationText = ""
+        refreshGit(settings.value)
+
+        // `GitRunner()` is built here, per press, so installing the Command Line Tools after being
+        // told to — and pressing Verify again — works without relaunching.
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let result = GitSyncValidation.run(address: address, branch: branch, runner: GitRunner())
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.verifying = false
+                    self.verificationText = Self.describe(result)
+                    // Only if the fields still say what was checked.
+                    self.verifiedKey = result.passed && key == self.currentKey ? key : nil
+                    self.refreshGit(self.settings.value)
+                }
+            }
+        }
+    }
+
+    /// One line per step, ✓ or ✗; a pass is just "Ready to sync" and the branch's own note.
+    private static func describe(_ result: GitSyncValidation) -> String {
+        if result.passed {
+            let branch = result.entries.last?.detail ?? ""
+            return [tr("storage.git.verified"), branch].filter { !$0.isEmpty }.joined(separator: " ")
+        }
+        return result.entries.map { entry in
+            (entry.passed ? "✓ " : "✗ ") + entry.step.label
+                + (entry.detail.isEmpty ? "" : " — " + entry.detail)
+        }.joined(separator: "\n")
+    }
+
+    @objc private func enableSync() {
+        let address = currentAddress, branch = currentBranch
+        guard verifiedKey == currentKey else { return }
+
+        let vault = settings.value.vaultURL
+        let alert = NSAlert()
+        alert.messageText = tr("storage.git.enable.title", ["address": address])
+        var detail = tr("storage.git.enable.detail", ["path": Self.tilde(vault)])
+        let existing = GitSyncEngine(vault: vault, remoteURL: address, runner: GitRunner()).existingOrigin()
+        if let existing, existing != address {
+            detail += "\n\n" + tr("storage.git.enable.originChanges", ["old": existing])
+        }
+        alert.informativeText = detail
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: tr("storage.git.enable"))
+        alert.addButton(withTitle: tr("common.cancel"))
+        guard PlumePanel.steppingAside({ alert.runModal() }) == .alertFirstButtonReturn else { return }
+
+        settings.update { $0.gitSync = GitSyncSettings(enabled: true, remoteURL: address, branch: branch) }
+        refresh(settings.value)
+    }
+
+    @objc private func stopSync() {
+        guard confirmStop() else { return }
+        settings.update { $0.gitSync.enabled = false }
+        gitChosen = false
+        verifiedKey = nil
+        verificationText = ""
+        refresh(settings.value)
+    }
+
+    @objc private func syncNowTapped() { onSyncNow?() }
+
+    private func confirmStop() -> Bool {
+        let alert = NSAlert()
+        alert.messageText = tr("storage.git.stop.title")
+        alert.informativeText = tr("storage.git.stop.detail")
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: tr("storage.git.stop"))
+        alert.addButton(withTitle: tr("common.cancel"))
+        return PlumePanel.steppingAside { alert.runModal() } == .alertFirstButtonReturn
     }
 
     // MARK: - Actions
@@ -141,7 +398,43 @@ final class StorageSettingsViewController: NSViewController {
     }
 
     @objc private func syncChanged(_ sender: NSPopUpButton) {
-        let destination = sender.indexOfSelectedItem == 1 ? Self.iCloudDriveVault
+        let choice = sender.indexOfSelectedItem
+        let current = settings.value
+
+        if choice == 2 {
+            // The repository is the notes folder, and iCloud would sync `.git` itself.
+            if Self.isInICloudDrive(current.vaultURL) {
+                let alert = NSAlert()
+                alert.messageText = tr("storage.git.icloud.title")
+                alert.informativeText = tr("storage.git.icloud.detail")
+                alert.alertStyle = .warning
+                _ = PlumePanel.steppingAside { alert.runModal() }
+                refresh(current)
+                return
+            }
+            gitChosen = true
+            refresh(current)
+            return
+        }
+
+        if current.gitSync.enabled {
+            guard confirmStop() else {
+                refresh(current)
+                return
+            }
+            settings.update { $0.gitSync.enabled = false }
+            gitChosen = false
+            // "Off" while syncing with Git means *stop syncing*, not "move my notes to the default
+            // folder": the folder is wherever the repository was put, and it stays.
+            if choice == 0 {
+                refresh(settings.value)
+                return
+            }
+        }
+        gitChosen = false
+        refresh(settings.value)
+
+        let destination = choice == 1 ? Self.iCloudDriveVault
             : URL(fileURLWithPath: (Settings.defaultVaultPath as NSString).expandingTildeInPath)
         let source = settings.value.vaultURL
 
@@ -258,5 +551,14 @@ final class StorageSettingsViewController: NSViewController {
     /// the one that matters.
     private static func tilde(_ url: URL) -> String {
         (url.path as NSString).abbreviatingWithTildeInPath
+    }
+}
+
+extension StorageSettingsViewController: NSTextFieldDelegate {
+    /// Editing the address or branch makes the last verification stale.
+    func controlTextDidChange(_ notification: Notification) {
+        if verifiedKey != currentKey { verifiedKey = nil }
+        if !verificationText.isEmpty && verifiedKey == nil { verificationText = "" }
+        refreshGit(settings.value)
     }
 }
