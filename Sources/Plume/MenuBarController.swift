@@ -421,24 +421,33 @@ final class MenuBarController: NSObject {
             }
             let ink: NSColor = coloured ? .labelColor : .black
 
-            if let phase = arrowPhase {
-                let box = NSRect(x: size.width - 11, y: 0, width: 11, height: 11)
-                NSGraphicsContext.current?.compositingOperation = .destinationOut
-                NSBezierPath(roundedRect: box.insetBy(dx: -1.2, dy: -1.2), xRadius: 3, yRadius: 3).fill()
-                NSGraphicsContext.current?.compositingOperation = .sourceOver
-                drawArrows(in: box, phase: phase, ink: ink)
-            }
-
+            // Cut first, paint after: the dot's gap and the arrows' gap are both punched out of
+            // the glyph before anything is drawn on top, so neither can eat the other's ink.
+            var spot: NSRect?
             if dot != .none {
                 let diameter = (size.height * (coloured ? 0.40 : 0.34)).rounded()
                 let gap = max(1, (diameter * 0.34).rounded())
-                let spot = NSRect(
+                let rect = NSRect(
                     x: size.width - diameter, y: size.height - diameter,
                     width: diameter, height: diameter
                 )
                 NSGraphicsContext.current?.compositingOperation = .destinationOut
-                NSBezierPath(ovalIn: spot.insetBy(dx: -gap, dy: -gap)).fill()
+                NSBezierPath(ovalIn: rect.insetBy(dx: -gap, dy: -gap)).fill()
                 NSGraphicsContext.current?.compositingOperation = .sourceOver
+                spot = rect
+            }
+
+            if let phase = arrowPhase {
+                let box = NSRect(x: size.width - 11, y: 0, width: 11, height: 11)
+                // The gap follows the arrows' own strokes rather than a box around them, so the
+                // glyph keeps everything the arrows are not touching.
+                NSGraphicsContext.current?.compositingOperation = .destinationOut
+                drawArrows(in: box, phase: phase, ink: .black, cut: true)
+                NSGraphicsContext.current?.compositingOperation = .sourceOver
+                drawArrows(in: box, phase: phase, ink: ink, cut: false)
+            }
+
+            if let spot {
                 switch dot {
                 case .failure: NSColor.systemRed.setFill()
                 case .conflict: NSColor.systemYellow.setFill()
@@ -461,7 +470,7 @@ final class MenuBarController: NSObject {
 
     /// An up arrow and a down arrow side by side, drifting in opposite directions and trading
     /// brightness, so the pair reads as traffic both ways.
-    private static func drawArrows(in box: NSRect, phase: Double, ink: NSColor) {
+    private static func drawArrows(in box: NSRect, phase: Double, ink: NSColor, cut: Bool) {
         func arrow(centerX: CGFloat, up: Bool, phase: Double) {
             let travel = CGFloat(phase) * 2 - 1                     // -1 → +1 across the cycle
             let shift = up ? travel : -travel
@@ -471,7 +480,9 @@ final class MenuBarController: NSObject {
             let wing: CGFloat = 2.3 * (up ? -1 : 1)
 
             let path = NSBezierPath()
-            path.lineWidth = 1.3
+            // A cut is the same path stroked wider, at full opacity whatever the arrow's own alpha:
+            // a half-faded arrow must not leave a half-faded gap.
+            path.lineWidth = cut ? 1.3 + 2 * 1.0 : 1.3
             path.lineCapStyle = .round
             path.lineJoinStyle = .round
             path.move(to: NSPoint(x: centerX, y: tail + shift))
@@ -479,7 +490,7 @@ final class MenuBarController: NSObject {
             path.move(to: NSPoint(x: centerX - 2.3, y: tip + shift + wing))
             path.line(to: NSPoint(x: centerX, y: tip + shift))
             path.line(to: NSPoint(x: centerX + 2.3, y: tip + shift + wing))
-            ink.withAlphaComponent(alpha).setStroke()
+            ink.withAlphaComponent(cut ? 1 : alpha).setStroke()
             path.stroke()
         }
         arrow(centerX: box.minX + 3, up: true, phase: phase)
