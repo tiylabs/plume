@@ -30,7 +30,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-TESTS="$PWD/Editor/tests"
+TESTS="$PWD/Editor/tests/webview"
 HTML="$PWD/Editor/dist/index.html"
 PROBE=Scripts/tools/editor-probe.swift
 

@@ -8,7 +8,7 @@ import { ensureSyntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { lineContext, type LineContext } from "../../src/keyboard/context";
 import type { KeyEdit } from "../../src/keyboard/edit";
-import { plumeDialect } from "../../src/dialect";
+import { plumeDialect } from "../../src/markdown/dialect";
 
 export interface Case {
   name: string;

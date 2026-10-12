@@ -11,7 +11,7 @@
 
 import { syntaxTree } from "@codemirror/language";
 import { endOfOwnContent } from "./blocks";
-import { pendingPair } from "./format-bar";
+import { pendingPair } from "../ui/format-bar";
 import { softBreakLines } from "./list-indent";
 import type { SyntaxNodeRef } from "@lezer/common";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";

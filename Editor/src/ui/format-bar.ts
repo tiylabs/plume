@@ -11,9 +11,9 @@
 
 import { syntaxTree } from "@codemirror/language";
 
-import { blockAt, blocksIn, containerPrefixOf, linesOf, markerSpanEnd, quoteMarksOnly } from "./blocks";
+import { blockAt, blocksIn, containerPrefixOf, linesOf, markerSpanEnd, quoteMarksOnly } from "../markdown/blocks";
 import { describe } from "./tooltip";
-import { onLanguageChange, t } from "./i18n";
+import { onLanguageChange, t } from "../i18n";
 import { type ChangeSet, type EditorState, type Extension, type Line, StateEffect, StateField } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
 import { EditorView } from "@codemirror/view";

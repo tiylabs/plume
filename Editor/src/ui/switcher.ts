@@ -7,7 +7,7 @@
  */
 
 import { desiredOverlayHeight, pointerMotion } from "./overlay";
-import { plural, t } from "./i18n";
+import { plural, t } from "../i18n";
 
 export interface NoteSummary {
   filename: string;

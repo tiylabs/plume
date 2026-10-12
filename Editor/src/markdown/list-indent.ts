@@ -26,7 +26,7 @@
 import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
-import type { KeyEdit } from "./keyboard/edit";
+import type { KeyEdit } from "../keyboard/edit";
 
 /** `   1. ` — the indent, the marker, and the space between the marker and the text. */
 const MARKER = /^([ \t]*)((?:[-*+]|\d+[.)]))([ \t]+)/;

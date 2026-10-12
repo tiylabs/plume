@@ -3,7 +3,7 @@ import PlumeKit
 
 /// The corpus the title bar is held to as well.
 ///
-/// `Editor/src/note-title.ts` is a port of `MarkdownDocument.title(of:)` — the title bar needs the
+/// `Editor/src/markdown/note-title.ts` is a port of `MarkdownDocument.title(of:)` — the title bar needs the
 /// answer on every keystroke and cannot afford a bridge round trip for it (decision 54) — so the
 /// rules genuinely live in two places. This table is run against both: here, and through a
 /// WKWebView probe against the TypeScript. Two names for one note is the bug it exists to catch.

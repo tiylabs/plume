@@ -16,7 +16,7 @@
 import { EditorSelection, type EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
-import { fencesOf, markerSpanEnd } from "../blocks";
+import { fencesOf, markerSpanEnd } from "../markdown/blocks";
 import type { Command } from "./edit";
 
 /** The block the caret moves with: its list item, or its block at the top of the note. */

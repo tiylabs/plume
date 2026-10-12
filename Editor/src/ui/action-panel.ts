@@ -24,7 +24,7 @@
 
 import { icon } from "./format-bar";
 import { desiredOverlayHeight, pointerMotion } from "./overlay";
-import { t } from "./i18n";
+import { t } from "../i18n";
 
 export interface ActionRow {
   id: string;

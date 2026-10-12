@@ -15,7 +15,7 @@
  */
 
 import { describe } from "./tooltip";
-import { onLanguageChange, t } from "./i18n";
+import { onLanguageChange, t } from "../i18n";
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 import { EditorSelection, StateEffect, StateField, type Extension } from "@codemirror/state";
 

@@ -41,18 +41,18 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 
-import { mountActionPanel, type SpaceAssignmentState, type DockSpaceAssignmentState } from "./action-panel";
-import { placeOverlay } from "./overlay";
-import { describe, hideTooltip, mountTooltips, setPointer } from "./tooltip";
-import { findHighlighting, mountFind } from "./find";
+import { mountActionPanel, type SpaceAssignmentState, type DockSpaceAssignmentState } from "./ui/action-panel";
+import { placeOverlay } from "./ui/overlay";
+import { describe, hideTooltip, mountTooltips, setPointer } from "./ui/tooltip";
+import { findHighlighting, mountFind } from "./ui/find";
 import { keyCommand } from "./keyboard/context";
 import { chain } from "./keyboard/edit";
 import { backspace } from "./keyboard/backspace";
 import { deleteToLineStart, deleteWordAtStart, lineEnd, lineStart, selectLineEnd, selectLineStart } from "./keyboard/line-edge";
 import { arrowDown, arrowUp, shiftArrowDown, shiftArrowUp } from "./keyboard/arrows";
 import { deleteForward } from "./keyboard/delete";
-import { caretPlaces } from "./caret";
-import { fencesOf, markerSpanEnd, notAPlace, ruleLine } from "./blocks";
+import { caretPlaces } from "./markdown/caret";
+import { fencesOf, markerSpanEnd, notAPlace, ruleLine } from "./markdown/blocks";
 import { enterKey } from "./keyboard/enter";
 import { shiftEnterKey } from "./keyboard/shift-enter";
 import { splitSpans } from "./keyboard/spans";
@@ -60,64 +60,19 @@ import { deleteOverMarks, keepPairs, moveOverSeams } from "./keyboard/pairs";
 import { openAbove, openAboveLeft, openBelow, openBelowRight } from "./keyboard/fence-exit";
 import { moveBlockDown, moveBlockUp, nothing, selectBlockEnd, selectBlockStart } from "./keyboard/move-block";
 import { shiftTab, tab } from "./keyboard/tab";
-import { caretBlankLineSlack, livePreview } from "./live-preview";
-import { renumberOrderedLists } from "./renumber";
-import { plumeDialect } from "./dialect";
-import { mountSwitcher, type NoteSummary } from "./switcher";
-import { MARKDOWN_FORMAT_KEYS, mountFormatBar, setHeading, pendingWrapExtension } from "./format-bar";
-import { noteTitle } from "./note-title";
-import { countCharacters, countWords } from "./word-count";
+import { caretBlankLineSlack, livePreview } from "./markdown/live-preview";
+import { renumberOrderedLists } from "./markdown/renumber";
+import { plumeDialect } from "./markdown/dialect";
+import { mountSwitcher, type NoteSummary } from "./ui/switcher";
+import { MARKDOWN_FORMAT_KEYS, mountFormatBar, setHeading, pendingWrapExtension } from "./ui/format-bar";
+import { noteTitle } from "./markdown/note-title";
+import { countCharacters, countWords } from "./markdown/word-count";
 import { onLanguageChange, plural, setLanguage, t, translateStaticMarkup } from "./i18n";
+import type { OutboundMessage, Rect } from "./bridge/protocol";
 
 // ---------------------------------------------------------------------------------------------
 // Bridge
 // ---------------------------------------------------------------------------------------------
-
-type OutboundMessage =
-  | { type: "ready" }
-  | { type: "edited"; text: string; caret: number }
-  | { type: "caret"; caret: number; scrollLine: number }
-  | { type: "requestNotes"; query: string }
-  | { type: "openNote"; filename: string }
-  | { type: "createNote"; title: string }
-  | { type: "togglePin"; filename: string | null }
-  | { type: "deleteNote"; filename: string }
-  | { type: "close" }
-  | { type: "contentHeight"; height: number }
-  | { type: "switcherOpen"; open: boolean; height: number }
-  | { type: "actionsOpen"; open: boolean; height: number }
-  | { type: "revealInFinder" }
-  /**
-   * ⌘-click on a link (decision 138). Carries the node's raw text, not a URL: whether that text may
-   * be opened at all is `LinkTarget.resolve`'s question, in PlumeKit where it is tested.
-   */
-  | { type: "openLink"; target: string }
-  /** ⌘K row fifteen (decision 103). Swift owns the vault, so the page can only ask. */
-  | { type: "renameFile" }
-  | { type: "openSettings" }
-  | { type: "copyAsMarkdown"; text: string }
-  | { type: "exportNote"; text: string }
-  | { type: "toggleHideFromCapture" }
-  | { type: "toggleAutoSizing" }
-  /** ⌘K's Assign to Desktop: `Settings.SpaceAssignment`'s raw value. Swift works out the desktop. */
-  | { type: "setSpaceAssignment"; mode: string }
-  | { type: "toggleKeepOnTop" }
-  | { type: "toggleFooterCount" }
-  | { type: "duplicateNote"; text: string }
-  | { type: "requestDeleted" }
-  | { type: "restoreDeleted"; storedName: string }
-  | { type: "forgetDeleted"; storedName: string }
-  | { type: "textSize"; action: "in" | "out" | "reset" }
-  | { type: "navigate"; back: boolean }
-  | { type: "dragRegions"; titleBar: Rect; exclusions: Rect[]; close: Rect }
-  | { type: "headingMenu"; button: Rect; level: number | null };
-
-interface Rect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 
 declare global {
   interface Window {

@@ -16,7 +16,7 @@ import type { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
 import type { EditorView } from "@codemirror/view";
-import { TEXT_CONSTRUCTS } from "../decorate";
+import { TEXT_CONSTRUCTS } from "../markdown/decorate";
 import type { Command } from "./edit";
 
 export interface Span {

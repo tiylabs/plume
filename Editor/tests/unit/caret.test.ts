@@ -4,8 +4,8 @@
  * with `|` where it rests. `span:` asks where line's marker span ends: the document with `|` there.
  */
 
-import { placeFor } from "../../src/caret";
-import { markerSpanEnd, notAPlace } from "../../src/blocks";
+import { placeFor } from "../../src/markdown/caret";
+import { markerSpanEnd, notAPlace } from "../../src/markdown/blocks";
 import { stateFor, type Case } from "./harness";
 
 const mark = (text: string, at: number) => text.slice(0, at) + "|" + text.slice(at);

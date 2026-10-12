@@ -14,7 +14,7 @@
 
 import { EditorSelection, type RangeSet } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { markerSpanEnd } from "../blocks";
+import { markerSpanEnd } from "../markdown/blocks";
 import type { Command } from "./edit";
 
 function atomsOf(view: EditorView): RangeSet<any>[] {

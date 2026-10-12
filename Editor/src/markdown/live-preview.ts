@@ -21,7 +21,7 @@
 import { syntaxTree } from "@codemirror/language";
 import { buildDecorations, TEXT_STYLE_CLASSES } from "./decorate";
 import { markerSpanEnd, notAPlace } from "./blocks";
-import { pendingPair } from "./format-bar";
+import { pendingPair } from "../ui/format-bar";
 import { arrivedByEditAfter, revealPolicy } from "./reveal";
 import type { SyntaxNode } from "@lezer/common";
 import {

@@ -22,8 +22,8 @@
 import { cursorLineDown, cursorLineUp, selectLineDown, selectLineUp } from "@codemirror/commands";
 import { EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { markerSpanEnd, notAPlace } from "../blocks";
-import { placeFor, placeRangeEnd } from "../caret";
+import { markerSpanEnd, notAPlace } from "../markdown/blocks";
+import { placeFor, placeRangeEnd } from "../markdown/caret";
 import type { Command } from "./edit";
 
 /** Hidden ranges — replaced markers and widgets — overlapping `from..to`, as offsets into it. */
