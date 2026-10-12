@@ -1,7 +1,7 @@
 /*
  * The ⌘P switcher's geometry: what the arrow keys actually put on screen.
  *
- * The third suite driven by `Scripts/editor-probe.swift`, and it exists for the same reason the
+ * The third suite driven by `Scripts/tools/editor-probe.swift`, and it exists for the same reason the
  * markdown suite does — the bug it was written for is invisible to anything that only reads the DOM.
  * The rows were right, the selection was right, the scroll offset was right, and the list still
  * looked broken, because a `position: absolute` overlay inside a scroll container scrolls with the

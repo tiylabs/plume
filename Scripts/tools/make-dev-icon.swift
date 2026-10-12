@@ -3,7 +3,9 @@ import AppKit
 import Foundation
 
 // Derive only the dev asset; regenerating it must never rewrite the shipped artwork.
+// Scripts/tools/make-dev-icon.swift -> the repository root is three levels up.
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+    .deletingLastPathComponent()
 guard let source = NSImage(contentsOf: root.appendingPathComponent("App/AppIcon.icns")) else {
     fatalError("could not read App/AppIcon.icns")
 }

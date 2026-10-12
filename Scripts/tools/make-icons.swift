@@ -2,9 +2,9 @@
 //
 // Turns the two design exports in Design/ into the assets the app bundle wants.
 //
-//   Scripts/make-icons.swift
-//   Scripts/make-icons.swift --app-only   leave menu-bar resources unchanged
-//   Scripts/make-icons.swift --menu-only  leave app icons unchanged
+//   Scripts/tools/make-icons.swift
+//   Scripts/tools/make-icons.swift --app-only   leave menu-bar resources unchanged
+//   Scripts/tools/make-icons.swift --menu-only  leave app icons unchanged
 //
 // Run it by hand when the artwork changes; the outputs are committed, so a plain checkout builds
 // without needing to regenerate anything. `Scripts/build-app.sh` picks both of them up on its own.
@@ -240,8 +240,10 @@ func resize(_ image: CGImage, to size: Int) -> CGImage {
 // Run
 // ---------------------------------------------------------------------------------------------
 
+// Scripts/tools/make-icons.swift -> the repository root is three levels up from the script.
 let root = URL(fileURLWithPath: CommandLine.arguments.first.map {
-    URL(fileURLWithPath: $0).deletingLastPathComponent().deletingLastPathComponent().path
+    URL(fileURLWithPath: $0).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().path
 } ?? FileManager.default.currentDirectoryPath)
 
 let design = root.appendingPathComponent("Design")
@@ -249,7 +251,7 @@ let appFolder = root.appendingPathComponent("App")
 let resources = appFolder.appendingPathComponent("Resources")
 let arguments = Array(CommandLine.arguments.dropFirst())
 guard arguments.isEmpty || arguments == ["--app-only"] || arguments == ["--menu-only"] else {
-    fail("usage: Scripts/make-icons.swift [--app-only|--menu-only]")
+    fail("usage: Scripts/tools/make-icons.swift [--app-only|--menu-only]")
 }
 
 // ---- app icon ---------------------------------------------------------------------------------

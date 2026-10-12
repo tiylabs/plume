@@ -25,7 +25,7 @@ test-all: $(EDITOR_DIR)/node_modules ## Run every suite: PlumeKit, typecheck, ke
 	Scripts/test-all.sh
 
 dev: $(EDITOR_DIR)/node_modules ## Rebuild the isolated Plume Dev.app without stopping the release app
-	swift Scripts/dev-app.swift stop "$(CURDIR)/$(DEV_APP)" "$(CURDIR)/build/Plume.app"
+	swift Scripts/tools/dev-app.swift stop "$(CURDIR)/$(DEV_APP)" "$(CURDIR)/build/Plume.app"
 	Scripts/build-app.sh --debug
 	open "$(CURDIR)/$(DEV_APP)"
 

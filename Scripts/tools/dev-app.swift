@@ -44,7 +44,7 @@ if arguments.count == 2, arguments[1] == "--test" {
 }
 
 guard arguments.count == 4, ["stop", "inspect"].contains(arguments[1]) else {
-    fail("usage: swift Scripts/dev-app.swift stop|inspect <Plume Dev.app> <legacy Plume.app>")
+    fail("usage: swift Scripts/tools/dev-app.swift stop|inspect <Plume Dev.app> <legacy Plume.app>")
 }
 let developmentPath = canonicalPath(URL(fileURLWithPath: arguments[2]))
 let legacyPath = canonicalPath(URL(fileURLWithPath: arguments[3]))

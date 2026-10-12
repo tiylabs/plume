@@ -37,11 +37,9 @@ if [[ "$only" != kit ]]; then
 	step "Theme contract"     bash -c 'cd Editor && node tests/theme-contract.mjs'
 	step "Bridge names"       bash -c 'cd Editor && node tests/bridge-names.mjs'
 	step "Editor bundle"      bash -c 'cd Editor && node build.mjs >/dev/null'
-	step "Command matrix"     Scripts/test-editor.sh --skip-editor
-	step "Markdown"           Scripts/test-markdown.sh --skip-editor
-	step "Switcher"           Scripts/test-switcher.sh --skip-editor
-	step "Tooltip"            Scripts/test-tooltip.sh --skip-editor
-	step "i18n"               Scripts/test-i18n.sh --skip-editor
+	# Every WKWebView suite (commands, markdown, switcher, space-assignment, narrow, tooltip, i18n);
+	# the list lives in Scripts/test-web.sh. The bundle was built once, two steps up.
+	step "WKWebView suites"   Scripts/test-web.sh --skip-editor
 fi
 
 echo

@@ -10,7 +10,7 @@
  * whether pressing it twice returns the note to exactly what it was. Decision 5 says what lands on
  * disk is what was typed, so bytes are the only assertion worth making here.
  *
- * Run with `Scripts/test-editor.sh`. Runs in a real WKWebView against the real parser, because the
+ * Run with `Scripts/test-web.sh commands`. Runs in a real WKWebView against the real parser, because the
  * browser harness cannot measure layout and a mocked tree would not catch the bugs this is for.
  */
 

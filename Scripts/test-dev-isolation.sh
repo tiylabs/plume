@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-swift Scripts/dev-app.swift --test
+swift Scripts/tools/dev-app.swift --test
 python3 - "$ROOT" <<'PY'
 import pathlib, plistlib, sys
 root = pathlib.Path(sys.argv[1])
