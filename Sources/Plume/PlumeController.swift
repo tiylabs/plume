@@ -143,6 +143,10 @@ final class PlumeController: NSObject {
 
     private var lastContentHeight: CGFloat = PlumePanel.defaultHeight
     private let autoSizeBadge = AutoSizeBadge()
+    private let spaceNotice = SpaceNotice()
+    /// A summon from another desktop of a panel kept to one it has not been filed on yet — parked at
+    /// launch somewhere else. It comes up when you arrive; see `activeSpaceDidChange`.
+    private var summonOnArrival = false
     private var mouseMonitors: [Any] = []
     private var isHovered = false
     private var isCloseHovered = false
@@ -208,6 +212,13 @@ final class PlumeController: NSObject {
         // Through the panel rather than by setting the origin here, because "offscreen" is a state
         // the panel defends and not just a coordinate — see `PlumePanel.parkBeforeFirstSummon`.
         panel.parkBeforeFirstSummon()
+
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(activeSpaceDidChange),
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil
+        )
     }
 
     // MARK: - Plume state
@@ -233,6 +244,10 @@ final class PlumeController: NSObject {
     // MARK: - Summon and dismiss
 
     var isVisible: Bool { panel.isSummoned }
+
+    /// Up on the Space being looked at. A panel kept to its Space (93) can be up on another one, and a
+    /// route that acts on the panel has to bring it here first (180) or it acts where nobody can see.
+    private var isHere: Bool { isVisible && panel.isOnActiveSpace }
 
     /// Puts a message over the note for a moment. `dwell` is for a toast that is not a receipt —
     /// see the editor's `showToast` and decision 136.
@@ -266,11 +281,13 @@ final class PlumeController: NSObject {
         guard Date().timeIntervalSince(lastToggle) > 0.25 else { return }
         lastToggle = Date()
 
+        let elsewhere = assignedDesktopElsewhere()
         switch HotkeyPress.resolve(
             isUp: isVisible,
             onActiveSpace: panel.isOnActiveSpace,
             hasFocus: panel.isKeyWindow,
-            dismissMode: settings.value.dismissMode
+            dismissMode: settings.value.dismissMode,
+            keptElsewhere: elsewhere != nil
         ) {
         case .summon:
             summon()
@@ -281,6 +298,8 @@ final class PlumeController: NSObject {
             refocus()
         case .dismiss:
             dismiss()
+        case .elsewhere:
+            if let elsewhere { summonElsewhere(on: elsewhere) }
         }
     }
 
@@ -294,6 +313,13 @@ final class PlumeController: NSObject {
     }
 
     func summon() {
+        // Kept to one desktop and summoned from another: it stays where it is, and says so. Every
+        // route in comes through here — the menu bar, the Dock icon, a note opened from a menu.
+        if let desktop = assignedDesktopElsewhere() {
+            summonElsewhere(on: desktop)
+            return
+        }
+
         // The active display is the one the pointer is on — Spotlight's convention, and the only
         // definition that matches where the user is looking.
         //
@@ -378,6 +404,81 @@ final class PlumeController: NSObject {
         // `frontmostApplication` stays with the other app throughout — so in the common case this is
         // a no-op, and in the case where a click into the panel *did* activate us, it is the fix.
         if NSApp.isActive { NSApp.deactivate() }
+    }
+
+    // MARK: - Kept to one desktop
+
+    /// The desktop `oneSpace` keeps to, when that is the setting and the desktop still exists.
+    ///
+    /// A desktop removed in Mission Control takes the setting back to None, saved, so the ⌘K row
+    /// says so too. A lookup that merely failed does not: `Spaces.isGone` only answers yes when it
+    /// could see every desktop and this was not among them.
+    private func assignedDesktop() -> Spaces.Desktop? {
+        guard settings.value.spaceAssignment == .oneSpace, let uuid = settings.value.assignedSpace
+        else { return nil }
+        if let desktop = Spaces.desktop(uuid: uuid) { return desktop }
+        if Spaces.isGone(uuid) {
+            settings.update {
+                $0.spaceAssignment = .unassigned
+                $0.assignedSpace = nil
+            }
+        }
+        return nil
+    }
+
+    /// The desktop the panel keeps to, when it keeps to one and that is not the one being looked at.
+    /// Nil whenever the answer cannot be had, which is `oneSpace` behaving as None rather than as a
+    /// summon that does nothing.
+    private func assignedDesktopElsewhere() -> Spaces.Desktop? {
+        guard let desktop = assignedDesktop(), let active = Spaces.active(), active.uuid != desktop.uuid
+        else { return nil }
+        return desktop
+    }
+
+    /// A summon of a panel kept to another desktop: up there if it was parked there, and a notice
+    /// here either way. Nothing moves and the focus stays with the app you summoned from.
+    private func summonElsewhere(on desktop: Spaces.Desktop) {
+        if !isVisible {
+            if Spaces.of(windowNumber: panel.windowNumber) == desktop, let frame = panel.rememberedFrame {
+                panel.present(at: frame)
+                applyContentHeight(heightWanted)
+                // Still a new sitting with the note — see `summon`.
+                editor.call("resetHistory")
+                onSummoned?()
+                if currentFilename == nil, !isDraft {
+                    openLastUsedNote()
+                }
+                startTrackingResizeEdge()
+            } else {
+                summonOnArrival = true
+            }
+        }
+        spaceNotice.show(tr("notice.elsewhere", ["number": String(desktop.number)]))
+    }
+
+    /// Arriving on the desktop a panel keeps to files a parked panel there if it is not yet, and puts
+    /// it up if a summon from elsewhere was waiting for it. Every arrival also tells the ⌘K row which
+    /// desktop "This Desktop" would mean now.
+    @objc private func activeSpaceDidChange() {
+        defer { sendSpaceAssignment() }
+        guard let desktop = assignedDesktop(), Spaces.active() == desktop else { return }
+        panel.parkOnActiveSpace()
+        if summonOnArrival {
+            summonOnArrival = false
+            summon()
+        }
+    }
+
+    /// What the ⌘K row shows: the choice, and the desktop "This Desktop" names — the one it keeps
+    /// to, or the one it would keep to if chosen now. Without SkyLight that row is not offered.
+    private func sendSpaceAssignment() {
+        let assignment = settings.value.spaceAssignment
+        let desktop = assignment == .oneSpace ? assignedDesktop() : Spaces.active()
+        editor.call("setSpaceAssignment", [
+            assignment.rawValue,
+            desktop.map { $0.number as Any } ?? NSNull(),
+            Spaces.isAvailable,
+        ])
     }
 
     private func rememberFrame() {
@@ -1298,12 +1399,12 @@ final class PlumeController: NSObject {
     }
 
     func openSwitcher() {
-        if !isVisible { summon() }
+        if !isHere { summon() }
         editor.call("openSwitcher")
     }
 
     func openActions() {
-        if !isVisible { summon() }
+        if !isHere { summon() }
         editor.call("openActions")
     }
 
@@ -1372,7 +1473,8 @@ final class PlumeController: NSObject {
         // A borderless transparent window's shadow is cast by its rectangular backing, so over glass
         // it showed as a square black frame around the rounded panel. Glass has its own edge.
         panel.hasShadow = !editor.usesGlass
-        panel.showsOnEverySpace = settings.value.showOnEverySpace
+        panel.showsOnEverySpace = settings.value.spaceAssignment == .everySpace
+        if settings.value.spaceAssignment != .oneSpace { summonOnArrival = false }
         panel.keepsOnTop = settings.value.keepOnTop
         editor.holdsFocusedLook = settings.value.keepOnTop
         editor.call("setKeepOnTop", [settings.value.keepOnTop])
@@ -1380,7 +1482,7 @@ final class PlumeController: NSObject {
         // Not a setting — panel state — but this runs on `ready`, which is the one moment the web
         // layer needs telling. Its ⌘K label is otherwise wrong until the row is pressed once.
         editor.call("setAutoSizing", [plumeState.autoSizing])
-        editor.call("setOnEverySpace", [settings.value.showOnEverySpace])
+        sendSpaceAssignment()
 
         // The material picks its light or dark variant from the window's appearance, so the two have
         // to be told the same thing — otherwise a dark-mode panel gets a light blur behind dark text.
@@ -1598,12 +1700,29 @@ extension PlumeController: EditorWebViewDelegate {
         case .toggleAutoSizing:
             toggleAutoSizing()
 
-        case .toggleSpaceBehaviour:
-            let now = !settings.value.showOnEverySpace
-            settings.update { $0.showOnEverySpace = now }
-            // Decision 73's rule, reached by a second route: what this changes is invisible until
-            // you switch Space, so without a line the key reads as having done nothing at all.
-            editor.call("showToast", [now ? tr("toast.everySpace") : tr("toast.thisSpace")])
+        case .setSpaceAssignment(let mode):
+            guard let assignment = Settings.SpaceAssignment(rawValue: mode) else { return }
+            // "This Desktop" is the one the panel is on, which is the one being looked at: ⌘K is open
+            // in it. A panel on every Space has no one desktop, so it is the active one there.
+            let desktop = assignment == .oneSpace
+                ? Spaces.of(windowNumber: panel.windowNumber) ?? Spaces.active()
+                : nil
+            guard assignment != .oneSpace || desktop != nil else { return }
+            settings.update {
+                $0.spaceAssignment = assignment
+                $0.assignedSpace = desktop?.uuid
+            }
+            // `settings.update` reaches `applySettings` asynchronously; the choice should act at once.
+            panel.showsOnEverySpace = assignment == .everySpace
+            sendSpaceAssignment()
+            // Decision 73's rule: what this changes is invisible until you switch Space, so without a
+            // line the row reads as having done nothing at all.
+            let toast = switch assignment {
+            case .unassigned: tr("toast.spaceAssignment.unassigned")
+            case .oneSpace: tr("toast.spaceAssignment.oneSpace", ["number": String(desktop?.number ?? 0)])
+            case .everySpace: tr("toast.spaceAssignment.everySpace")
+            }
+            editor.call("showToast", [toast])
 
         case .toggleKeepOnTop:
             // Spelled out before the update, never read inside the closure: see `toggleFooterCount`.
@@ -1618,7 +1737,7 @@ extension PlumeController: EditorWebViewDelegate {
             // Read out of the store *before* the update, never inside the closure: `settings.update`
             // holds a modifying access for the length of it, so `settings.value` in there is a
             // simultaneous read of the same storage and Swift traps the process on the spot. Every
-            // other toggle here spells the value out first for this reason (`toggleSpaceBehaviour`);
+            // other toggle here spells the value out first for this reason (`toggleKeepOnTop`);
             // this one did not, and the crash is invisible to every suite because it needs the
             // message to actually arrive from a running panel.
             let next = settings.value.footerCount.other

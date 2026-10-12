@@ -42,7 +42,9 @@ enum PlumeMessage {
     case toggleHideFromCapture
     /// ⇧⌘/. Auto-sizing is window state, so only Swift can hold it (decision 40).
     case toggleAutoSizing
-    case toggleSpaceBehaviour
+    /// ⌘K's Assign to Desktop row: `Settings.SpaceAssignment`'s raw value. Which desktop *This
+    /// Desktop* means is Swift's to work out — the page cannot see Spaces.
+    case setSpaceAssignment(String)
     /// The title bar's thumbtack. Window level is window state, so the page only asks.
     case toggleKeepOnTop
     case toggleFooterCount
@@ -121,8 +123,8 @@ enum PlumeMessage {
             self = .toggleHideFromCapture
         case "toggleAutoSizing":
             self = .toggleAutoSizing
-        case "toggleSpaceBehaviour":
-            self = .toggleSpaceBehaviour
+        case "setSpaceAssignment":
+            self = .setSpaceAssignment(string("mode"))
         case "toggleKeepOnTop":
             self = .toggleKeepOnTop
         case "toggleFooterCount":

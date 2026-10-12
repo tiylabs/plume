@@ -161,7 +161,7 @@ final class PlumePanel: NSPanel {
 
     // MARK: - Spaces
 
-    /// Every panel joins every Space, pinned or not.
+    /// Assigned to every Space (`SpaceAssignment.everySpace`), every panel joins every Space, pinned or not.
     ///
     /// This reverses the Space half of rule 5, and the reason is that the rule was built on a
     /// conflation the design record itself makes. "Pinned" means two different things in two
@@ -183,14 +183,17 @@ final class PlumePanel: NSPanel {
     ///
     /// `.fullScreenAuxiliary` joins a fullscreen app as an overlay rather than forcing a Space
     /// switch out of it.
-    /// `Settings.showOnEverySpace`, kept here because `summon` re-asserts the behaviour on every
-    /// summon and has no route to the settings store.
+    /// `Settings.spaceAssignment == .everySpace`, kept here because `summon` re-asserts the
+    /// behaviour on every summon and has no route to the settings store.
     ///
     /// Off drops `.canJoinAllSpaces`, so the panel belongs to the Space it is on rather than being
     /// drawn on all of them. `.ignoresCycle` and `.fullScreenAuxiliary` stay either way — the panel
     /// is never a ⌘Tab candidate, and it still overlays a fullscreen app rather than forcing a
     /// Space switch out of one.
-    var showsOnEverySpace = true {
+    ///
+    /// Off is the default, so it is the initial value too: the panel is ordered in offscreen at
+    /// startup, before `applySettings` runs. See `Settings.spaceAssignment` for why off.
+    var showsOnEverySpace = false {
         didSet { if showsOnEverySpace != oldValue { applyCollectionBehaviour() } }
     }
 
@@ -282,6 +285,31 @@ final class PlumePanel: NSPanel {
         if !showsOnEverySpace && !isOnActiveSpace { orderOut(nil) }
 
         bringToFront()
+    }
+
+    /// Puts a parked panel back on screen on the desktop it is on, which is not the one being looked
+    /// at — a panel kept to one desktop (`SpaceAssignment.oneSpace`), summoned from another.
+    ///
+    /// No ordering and no key. Ordering front is what would carry it across a Space boundary, and
+    /// the focus belongs to the app you summoned from, where you still are. It is on screen when you
+    /// get there.
+    func present(at frame: CGRect) {
+        guard parked else { return }
+        onscreenFrame = frame
+        parked = false
+        setFrame(frame, display: false)
+    }
+
+    /// Re-files a parked panel on the desktop being looked at, still offscreen.
+    ///
+    /// For a panel kept to one desktop that is not on it — it was parked at launch wherever Plume
+    /// happened to start. Arriving on its desktop puts it there, so the next summon finds it home and
+    /// a summon from elsewhere can `present` it in place. Ordering out and back in is the only
+    /// public way to place a window on a Space (see `summon`).
+    func parkOnActiveSpace() {
+        guard parked, !showsOnEverySpace, !isOnActiveSpace else { return }
+        orderOut(nil)
+        orderFront(nil)
     }
 
     /// Parks the panel before it has ever been summoned.

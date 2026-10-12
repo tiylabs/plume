@@ -345,6 +345,7 @@ public struct Settings: Codable, Equatable, Sendable {
 
     private enum LegacyCodingKeys: String, CodingKey {
         case translucentPanes
+        case showOnEverySpace
     }
 
     /// Frame 2a's "Hide While Screen Sharing", as `NSWindow.sharingType` (decision 36).
@@ -354,17 +355,40 @@ public struct Settings: Codable, Equatable, Sendable {
     /// worse than one that was never offered.
     public var hideFromScreenCapture: Bool
 
-    /// Whether the panel is on every Space, or belongs to the one it was summoned on.
+    /// Which Space the panel belongs to — the Dock's own three answers to *Assign To*, so that the
+    /// two read the same way. The Dock's menu cannot reach the panel itself: `.canJoinAllSpaces`
+    /// overrides it, and without that flag a Dock binding pins the window where Plume cannot move it.
     ///
-    /// On is decision 33's behaviour and the default: `.canJoinAllSpaces`, so the panel is already
-    /// everywhere and summoning is only ever a matter of moving it back on screen. That is right for
-    /// a panel you want beside whatever you are doing.
+    /// Decision 33 is not reversed by any of this: its complaint was that Space behaviour was a *side
+    /// effect of pinning*, not that any one behaviour was wrong. This is the explicit control it was
+    /// asking for.
+    public enum SpaceAssignment: String, Codable, Equatable, Sendable, CaseIterable {
+        /// The Dock's *None*, and the default. The panel belongs to the Space it is on, holding one
+        /// train of thought there, and summoned from another Space it comes to the one you are on
+        /// (180).
+        case unassigned
+        /// The Dock's *This Desktop*. The panel keeps to `assignedSpace`, and summoning it from
+        /// anywhere else says where it is rather than moving it.
+        case oneSpace
+        /// The Dock's *All Desktops*: decision 33's `.canJoinAllSpaces`, so the panel is already
+        /// everywhere and summoning is only ever a matter of moving it back on screen.
+        case everySpace
+    }
+
+    /// **Why not `everySpace` by default.** A window on every Space is drawn above both desktops for
+    /// the whole of a Space swipe and only drops behind the destination's windows once the swipe
+    /// lands. Measured on macOS 27: holding a swipe halfway keeps the panel on top for as long as the
+    /// fingers stay down, focused or not, and Stickies assigned to All Desktops does exactly the same.
+    /// Nothing an app can observe arrives before the swipe ends, so it cannot be made to stop.
     ///
-    /// Off is for the other way of working — a panel parked on one desktop, holding one train of
-    /// thought, that does not come along when you switch to something else. Decision 33 is not
-    /// reversed by this: its complaint was that Space behaviour was a *side effect of pinning*, not
-    /// that either behaviour was wrong. This is the explicit control it was asking for.
-    public var showOnEverySpace: Bool
+    /// Replaces `showOnEverySpace`, a Bool whose `false` was always the Dock's *None* and never *This
+    /// Desktop*; a file that still holds it reads as `everySpace` or `unassigned` accordingly.
+    public var spaceAssignment: SpaceAssignment
+
+    /// The desktop `oneSpace` keeps to, as the Space's UUID — the identifier macOS itself files Dock
+    /// bindings under, and the one that survives a restart and desktops being reordered. Nil for the
+    /// other two, and `oneSpace` without one reads as `unassigned`.
+    public var assignedSpace: String?
 
     /// Whether the panel stays above other applications' windows (the title bar's thumbtack).
     ///
@@ -410,7 +434,8 @@ public struct Settings: Codable, Equatable, Sendable {
         textSize: Double = 15,
         panelOpacity: Double = Settings.defaultPanelOpacity,
         hideFromScreenCapture: Bool = false,
-        showOnEverySpace: Bool = true,
+        spaceAssignment: SpaceAssignment = .unassigned,
+        assignedSpace: String? = nil,
         keepOnTop: Bool = false,
         checkForUpdates: Bool = BuildProfile.current.allowsSystemIntegration
     ) {
@@ -433,7 +458,8 @@ public struct Settings: Codable, Equatable, Sendable {
         self.textSize = textSize
         self.panelOpacity = min(max(panelOpacity, Self.panelOpacityRange.lowerBound), Self.panelOpacityRange.upperBound)
         self.hideFromScreenCapture = hideFromScreenCapture
-        self.showOnEverySpace = showOnEverySpace
+        self.spaceAssignment = spaceAssignment
+        self.assignedSpace = spaceAssignment == .oneSpace ? assignedSpace : nil
         self.keepOnTop = keepOnTop
         self.checkForUpdates = checkForUpdates
     }
@@ -481,8 +507,16 @@ public struct Settings: Codable, Equatable, Sendable {
             ?? (wasTranslucent == true ? Self.legacyTranslucentPanelOpacity : d.panelOpacity)
         hideFromScreenCapture =
             try c.decodeIfPresent(Bool.self, forKey: .hideFromScreenCapture) ?? d.hideFromScreenCapture
-        showOnEverySpace =
-            try c.decodeIfPresent(Bool.self, forKey: .showOnEverySpace) ?? d.showOnEverySpace
+        let everySpace = try legacy.decodeIfPresent(Bool.self, forKey: .showOnEverySpace)
+        spaceAssignment = SpaceAssignment(rawValue: try c.decodeIfPresent(String.self, forKey: .spaceAssignment) ?? "")
+            ?? everySpace.map { $0 ? SpaceAssignment.everySpace : .unassigned }
+            ?? d.spaceAssignment
+        assignedSpace = try c.decodeIfPresent(String.self, forKey: .assignedSpace)
+        if spaceAssignment != .oneSpace { assignedSpace = nil }
+        if spaceAssignment == .oneSpace, assignedSpace?.isEmpty ?? true {
+            spaceAssignment = .unassigned
+            assignedSpace = nil
+        }
         keepOnTop = try c.decodeIfPresent(Bool.self, forKey: .keepOnTop) ?? d.keepOnTop
         checkForUpdates =
             try c.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? d.checkForUpdates

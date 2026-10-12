@@ -62,5 +62,23 @@ export async function run(view, bar, doc) {
   const laidOut = keys.filter((el) => el.getBoundingClientRect().height > 0);
   check("hidden by width, never by display", keys.length, laidOut.length);
 
+  // Assign to Desktop names the setting in force, so its width depends on the setting: the longest
+  // of its labels has to fit too, not just the None the panel opens with — and so do its choices,
+  // indented under it. A search shows them without walking to the row.
+  const search = doc.querySelector(".actions__search");
+  for (const [mode, desktop] of [["oneSpace", 12], ["everySpace", null]]) {
+    window.plumeHost.openActions(); // a toggle: this closes it, so the labels are drawn afresh
+    window.plumeHost.setSpaceAssignment(mode, desktop, true);
+    window.plumeHost.openActions();
+    search.value = "desk";
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    const cut = [...doc.querySelectorAll(".actions__row .actions__label")]
+      .filter((label) => label.scrollWidth > label.clientWidth)
+      .map((label) => label.textContent);
+    const shown = doc.querySelectorAll(".actions__row--choice").length;
+    check(`Assign to Desktop's choices show for a search (${mode})`, 3, shown);
+    check(`Assign to Desktop fits (${mode})`, "none", cut.length ? cut.join(", ") : "none", cut.length === 0);
+  }
+
   return { checked, failures };
 }

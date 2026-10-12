@@ -71,7 +71,7 @@ final class GeneralSettingsViewController: NSViewController {
         ])
 
         // ---- behaviour ---------------------------------------------------------------------
-        // No Spaces row. `showOnEverySpace` is a ⌘K toggle (decision 93) and ⌘K is where the panel's
+        // No Spaces row. `spaceAssignment` is a ⌘K row (decision 93) and ⌘K is where the panel's
         // own toggles live — the format bar, auto-sizing and hiding from screen capture all persist
         // to `settings.json` exactly the same way and none of them has a row here.
         let login = SettingsForm.toggle(

@@ -16,6 +16,10 @@
  *
  * Every row here is a thing Plume actually does, so none of them is a row that does nothing — the
  * same rule the Shortcuts tab follows (decision 31).
+ *
+ * One row opens rather than runs: Assign to Desktop, which is the Dock's three-way *Assign To* and
+ * not a toggle. Its three choices unfold under it in place, the one in force ticked, and ⏎ on one
+ * of those is what runs.
  */
 
 import { icon } from "./format-bar";
@@ -44,12 +48,36 @@ interface ActionPanelOptions {
   isHiddenFromCapture: () => boolean;
   /** Same, for auto-sizing — which a drag can turn off without anyone pressing this row. */
   isAutoSizing: () => boolean;
-  /** Same, for whether the panel is drawn on every Space or belongs to the one it is on. */
-  isOnEverySpace: () => boolean;
+  /** Which desktop the panel is assigned to, as Swift last said. */
+  spaceAssignment: () => SpaceAssignmentState;
   run: (id: string) => void;
+  /** One of Assign to Desktop's choices was picked: `Settings.SpaceAssignment`'s raw value. */
+  chooseSpace: (mode: string) => void;
   /** The key caps to print for a row, from the bindings in force. Null keeps the row's own. */
   keysFor: (id: string) => string[] | null;
   onVisibilityChange: (open: boolean, height: number) => void;
+}
+
+/** The panel's Space assignment, from Swift — the page cannot see Spaces. */
+export interface SpaceAssignmentState {
+  /** `Settings.SpaceAssignment`'s raw value: `unassigned`, `oneSpace` or `everySpace`. */
+  mode: string;
+  /** The desktop This Desktop names: the one kept to, or the one it would keep to if chosen now. */
+  desktop: number | null;
+  /** Whether Swift can tell desktops apart at all. Without it there is no This Desktop to offer. */
+  canKeepToOne: boolean;
+}
+
+/** The row that unfolds, and what unfolds under it — in the Dock's order. */
+const SPACE_ROW = "spaceBehaviour";
+const SPACE_CHOICES = ["unassigned", "oneSpace", "everySpace"];
+const CHECK_SVG = `<path d="M20 6 9 17l-5-5" />`;
+const CHEVRON_SVG = `<path d="m6 9 6 6 6-6" />`;
+
+/** A line in the list: a row, or one of the space row's choices under it. */
+interface Entry {
+  row: ActionRow;
+  choice?: string;
 }
 
 /** Grouped exactly as frame 2a groups them; the hairlines between groups are the grouping. */
@@ -148,8 +176,10 @@ export function mountActionPanel(options: ActionPanelOptions) {
   const search = root.querySelector<HTMLInputElement>(".actions__search")!;
   const list = root.querySelector<HTMLElement>(".actions__list")!;
 
-  let visible: ActionRow[] = [];
+  let visible: Entry[] = [];
   let selected = 0;
+  /** Whether Assign to Desktop's choices are showing. Folded again every time the panel opens. */
+  let expanded = false;
 
   function isOpen(): boolean {
     return plume.hasAttribute("data-actions");
@@ -160,10 +190,12 @@ export function mountActionPanel(options: ActionPanelOptions) {
     return desiredOverlayHeight(root, list);
   }
 
-  function open(): void {
+  /** @param unfoldSpace open on Assign to Desktop's choices, the one in force selected — ⌥⌘S. */
+  function open(unfoldSpace = false): void {
     if (isOpen()) return;
     plume.setAttribute("data-actions", "");
     search.value = "";
+    expanded = unfoldSpace;
     selected = 0;
     pointer.reset();
     render("");
@@ -171,6 +203,7 @@ export function mountActionPanel(options: ActionPanelOptions) {
     // the previous visit shows a different row under the highlight than the one ⏎ will run — which
     // is exactly what happened while this list was capped shorter than its own content.
     list.scrollTop = 0;
+    if (unfoldSpace) select(checkedChoiceIndex(), { scroll: true });
     search.focus();
     // Measured rather than assumed: the panel has to grow to hold this, and the panel's height
     // depends on how many rows survived the filter.
@@ -187,6 +220,16 @@ export function mountActionPanel(options: ActionPanelOptions) {
     isOpen() ? close() : open();
   }
 
+  /** ⌥⌘S: straight to the three choices, which is where a three-way setting's key should land. */
+  function openSpaceAssignment(): void {
+    if (!isOpen()) {
+      open(true);
+      return;
+    }
+    search.value = "";
+    unfold(true);
+  }
+
   function escapeHtml(text: string): string {
     return text.replace(
       /[&<>"']/g,
@@ -195,9 +238,32 @@ export function mountActionPanel(options: ActionPanelOptions) {
   }
 
   /** Substring, case-insensitive. Fourteen rows do not need fuzzy matching, and fuzzy on a short
-   *  fixed list mostly produces surprising matches rather than helpful ones. */
+   *  fixed list mostly produces surprising matches rather than helpful ones. A search for one of
+   *  Assign to Desktop's choices finds the row. */
   function matches(row: ActionRow, query: string): boolean {
-    return labelFor(row).toLowerCase().includes(query.toLowerCase().trim());
+    const needle = query.toLowerCase().trim();
+    const labels = row.id === SPACE_ROW ? [labelFor(row), ...choices().map(choiceLabel)] : [labelFor(row)];
+    return labels.some((label) => label.toLowerCase().includes(needle));
+  }
+
+  /** This Desktop is only offered when Swift can tell desktops apart (decision 31: no dead rows). */
+  function choices(): string[] {
+    const state = options.spaceAssignment();
+    return SPACE_CHOICES.filter((choice) => choice !== "oneSpace" || state.canKeepToOne);
+  }
+
+  function choiceLabel(choice: string): string {
+    const desktop = options.spaceAssignment().desktop;
+    if (choice === "oneSpace" && desktop !== null) {
+      return t("editor.action.spaceAssignment.oneSpaceNumbered", { number: String(desktop) });
+    }
+    return t(`editor.action.spaceAssignment.${choice}`);
+  }
+
+  function checkedChoiceIndex(): number {
+    const mode = options.spaceAssignment().mode;
+    const index = visible.findIndex((entry) => entry.choice === mode);
+    return index >= 0 ? index : Math.max(0, visible.findIndex((entry) => entry.row.id === SPACE_ROW));
   }
 
   function labelFor(row: ActionRow): string {
@@ -213,8 +279,17 @@ export function mountActionPanel(options: ActionPanelOptions) {
     if (row.id === "autoSizing" && !options.isAutoSizing()) {
       return t("editor.action.autoSizing.off");
     }
-    if (row.id === "spaceBehaviour" && !options.isOnEverySpace()) {
-      return t("editor.action.spaceBehaviour.off");
+    // The setting in force is in the label, as the toggles' state is: the choices are folded away
+    // until asked for, so this is where it shows the rest of the time.
+    // One desktop is named by the desktop alone, not "This Desktop (Desktop 3)": the row has the
+    // narrowest panel's width to fit in (`narrow.test.js`), and which desktop is the news.
+    if (row.id === SPACE_ROW) {
+      const { mode, desktop } = options.spaceAssignment();
+      const value =
+        mode === "oneSpace" && desktop !== null
+          ? t("editor.action.spaceAssignment.desktop", { number: String(desktop) })
+          : choiceLabel(mode);
+      return t("editor.action.spaceBehaviour", { value });
     }
     // Every row's name is `editor.action.<id>` in the catalog — not a literal here, which is what
     // lets a language be added without touching this file.
@@ -232,18 +307,28 @@ export function mountActionPanel(options: ActionPanelOptions) {
       html += `<div class="actions__group">`;
       for (const row of rows) {
         const index = visible.length;
-        visible.push(row);
+        visible.push({ row });
+        // A search that found the row by one of its choices is a search for that choice, so the
+        // choices show without a second step.
+        const unfolded = row.id === SPACE_ROW && (expanded || query.trim() !== "");
+        const disclosure =
+          row.id === SPACE_ROW
+            ? `<span class="actions__disclosure">${icon(CHEVRON_SVG, 12)}</span>`
+            : "";
         html += `
           <div class="actions__row${row.danger ? " actions__row--danger" : ""}"
-               role="option" data-index="${index}" aria-selected="${index === selected}">
+               role="option" data-index="${index}" aria-selected="${index === selected}"
+               ${row.id === SPACE_ROW ? `aria-expanded="${unfolded}"` : ""}>
             ${icon(row.svg).replace("<svg ", '<svg class="actions__icon" ')}
             <span class="actions__label">${escapeHtml(labelFor(row))}</span>
+            ${disclosure}
             <span class="actions__keys">
               ${(options.keysFor(row.id) ?? row.keys)
                 .map((k) => `<kbd>${escapeHtml(k)}</kbd>`)
                 .join("")}
             </span>
           </div>`;
+        if (unfolded) html += renderChoices(row);
       }
       html += `</div>`;
     }
@@ -254,6 +339,36 @@ export function mountActionPanel(options: ActionPanelOptions) {
     if (selected >= visible.length) selected = Math.max(0, visible.length - 1);
 
     list.innerHTML = html;
+  }
+
+  /** Assign to Desktop's choices, under it, the one in force ticked. */
+  function renderChoices(row: ActionRow): string {
+    const mode = options.spaceAssignment().mode;
+    let html = "";
+    for (const choice of choices()) {
+      const index = visible.length;
+      visible.push({ row, choice });
+      html += `
+        <div class="actions__row actions__row--choice" role="option" data-index="${index}"
+             aria-selected="${index === selected}" aria-checked="${choice === mode}">
+          ${icon(CHECK_SVG).replace("<svg ", '<svg class="actions__icon actions__check" ')}
+          <span class="actions__label">${escapeHtml(choiceLabel(choice))}</span>
+        </div>`;
+    }
+    return html;
+  }
+
+  /** Folds the choices out or away, keeping the selection on the same idea: the choice in force when
+   *  they open, the row itself when they close. */
+  function unfold(on: boolean): void {
+    expanded = on;
+    render(search.value);
+    const parent = visible.findIndex((entry) => entry.row.id === SPACE_ROW && entry.choice === undefined);
+    select(on ? checkedChoiceIndex() : Math.max(0, parent), { scroll: true });
+    // Opening is the one time the list grows after the panel was sized for it — the reason reporting
+    // once on open was enough no longer holds — so it reports again. Folding away does not: the
+    // panel keeps its height rather than jumping under your eyes.
+    if (on) options.onVisibilityChange(true, desiredHeight());
   }
 
   /** Stops at the ends rather than wrapping, for the reason spelled out on the switcher's `move`. */
@@ -284,13 +399,37 @@ export function mountActionPanel(options: ActionPanelOptions) {
   }
 
   function activate(): void {
-    const row = visible[selected];
-    if (!row) return;
+    const entry = visible[selected];
+    if (!entry) return;
+    // The row with choices under it opens or closes them; it has nothing of its own to run. Under a
+    // search they are already showing, so ⏎ goes down to the one in force instead.
+    if (entry.row.id === SPACE_ROW && entry.choice === undefined) {
+      unfold(search.value.trim() !== "" || !expanded);
+      return;
+    }
     // Closed before the action runs, not after: several of these change the panel underneath the
     // panel — Browse Notes opens the switcher in the same slot, Delete Note swaps the note out —
     // and a panel still on screen while that happens is a panel describing the wrong panel.
     close();
-    options.run(row.id);
+    if (entry.choice !== undefined) options.chooseSpace(entry.choice);
+    else options.run(entry.row.id);
+  }
+
+  /** → opens Assign to Desktop's choices, ← closes them from the row or any choice. Anywhere else
+   *  both keys belong to the search field's caret. */
+  function arrowFolds(key: string): boolean {
+    const entry = visible[selected];
+    if (!entry || entry.row.id !== SPACE_ROW) return false;
+    const open = expanded || search.value.trim() !== "";
+    if (key === "ArrowRight" && entry.choice === undefined && !open) {
+      unfold(true);
+      return true;
+    }
+    if (key === "ArrowLeft" && open && search.value.trim() === "") {
+      unfold(false);
+      return true;
+    }
+    return false;
   }
 
   // ---- Events -------------------------------------------------------------------------------
@@ -327,6 +466,10 @@ export function mountActionPanel(options: ActionPanelOptions) {
       case "Enter":
         event.preventDefault();
         activate();
+        break;
+      case "ArrowRight":
+      case "ArrowLeft":
+        if (arrowFolds(event.key)) event.preventDefault();
         break;
       case "Escape":
         event.preventDefault();
@@ -367,5 +510,5 @@ export function mountActionPanel(options: ActionPanelOptions) {
     activate();
   });
 
-  return { open, close, toggle, isOpen };
+  return { open: () => open(), close, toggle, isOpen, openSpaceAssignment };
 }

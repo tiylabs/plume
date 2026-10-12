@@ -122,6 +122,54 @@ func runSettingsTests() {
         }
     }
 
+    Check.suite("Space assignment setting") {
+        func decode(_ json: String) -> Settings? {
+            try? JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        }
+
+        Check.test("unassigned by default, including for settings files that predate it") {
+            Check.equal(Settings().spaceAssignment, .unassigned)
+            Check.equal(decode("{}")?.spaceAssignment, .unassigned)
+            Check.equal(decode("{}")?.assignedSpace, nil)
+        }
+
+        Check.test("the old every-Space Bool reads as All Desktops or None") {
+            Check.equal(decode(#"{"showOnEverySpace": true}"#)?.spaceAssignment, .everySpace)
+            Check.equal(decode(#"{"showOnEverySpace": false}"#)?.spaceAssignment, .unassigned)
+        }
+
+        Check.test("the new key wins over the old one") {
+            let json = #"{"showOnEverySpace": true, "spaceAssignment": "unassigned"}"#
+            Check.equal(decode(json)?.spaceAssignment, .unassigned)
+        }
+
+        Check.test("one desktop survives a round trip with its Space") {
+            var settings = Settings()
+            settings.spaceAssignment = .oneSpace
+            settings.assignedSpace = "53C42C34-D8AE-423A-A0DE-6688E8B3A4B7"
+            let data = try? JSONEncoder().encode(settings)
+            let back = data.flatMap { try? JSONDecoder().decode(Settings.self, from: $0) }
+            Check.equal(back?.spaceAssignment, .oneSpace)
+            Check.equal(back?.assignedSpace, "53C42C34-D8AE-423A-A0DE-6688E8B3A4B7")
+            Check.equal(String(data: data ?? Data(), encoding: .utf8)?.contains("showOnEverySpace"), false)
+        }
+
+        Check.test("one desktop with no Space to keep to reads as None") {
+            Check.equal(decode(#"{"spaceAssignment": "oneSpace"}"#)?.spaceAssignment, .unassigned)
+            Check.equal(decode(#"{"spaceAssignment": "oneSpace", "assignedSpace": ""}"#)?.spaceAssignment, .unassigned)
+        }
+
+        Check.test("a Space is only kept alongside one desktop") {
+            let json = #"{"spaceAssignment": "everySpace", "assignedSpace": "53C42C34"}"#
+            Check.equal(decode(json)?.assignedSpace, nil)
+        }
+
+        Check.test("an unknown value costs the field, not the file") {
+            Check.equal(decode(#"{"spaceAssignment": "somewhere", "keepOnTop": true}"#)?.spaceAssignment, .unassigned)
+            Check.equal(decode(#"{"spaceAssignment": "somewhere", "keepOnTop": true}"#)?.keepOnTop, true)
+        }
+    }
+
     Check.suite("Panel opacity setting") {
         func decode(_ json: String) -> Settings? {
             try? JSONDecoder().decode(Settings.self, from: Data(json.utf8))

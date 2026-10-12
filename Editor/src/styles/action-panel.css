@@ -195,6 +195,37 @@
   text-overflow: ellipsis;
 }
 
+/* ---- Assign to Desktop's choices ----------------------------------------------------------------
+ *
+ * Indented so the tick sits under the row's own label (10px padding, 14px icon, 10px gap) — they
+ * are answers to it, not rows of their own. The tick is the text colour, not the accent: decision 22
+ * keeps the accent for interactive state, and every one of these is equally pressable. */
+.actions__row--choice {
+  padding-left: 34px;
+}
+
+.actions__check {
+  visibility: hidden;
+}
+
+.actions__row--choice[aria-checked="true"] .actions__check {
+  visibility: visible;
+}
+
+.actions__disclosure {
+  display: flex;
+  flex: none;
+  color: var(--text-tertiary);
+}
+
+.actions__disclosure svg {
+  transition: transform 150ms ease;
+}
+
+.actions__row[aria-expanded="false"] .actions__disclosure svg {
+  transform: rotate(-90deg);
+}
+
 /* Delete is last, red and separated. The red is on the row's own colour so the icon follows the
  * label without a second rule. */
 .actions__row--danger {

@@ -14,13 +14,19 @@ public enum HotkeyPress: Equatable, Sendable {
     case focus
     /// Up here with the focus, and the hotkey toggles: hide it.
     case dismiss
+    /// Kept to one desktop (the Dock's *This Desktop*) and that desktop is not this one: say where it
+    /// is rather than move it, up or not.
+    case elsewhere
 
+    /// - Parameter keptElsewhere: the panel keeps to a desktop that is not the one being looked at.
     public static func resolve(
         isUp: Bool,
         onActiveSpace: Bool,
         hasFocus: Bool,
-        dismissMode: Settings.DismissMode
+        dismissMode: Settings.DismissMode,
+        keptElsewhere: Bool = false
     ) -> HotkeyPress {
+        guard !keptElsewhere else { return .elsewhere }
         guard isUp else { return .summon }
         guard onActiveSpace else { return .bringHere }
         guard hasFocus, dismissMode == .sameHotkeyToggles else { return .focus }
