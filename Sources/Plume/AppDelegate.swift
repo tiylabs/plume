@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBar: MenuBarController!
     private var hotkey: GlobalHotkey!
     private var watcher: VaultWatcher?
+    private let gitSync = GitSyncController()
     private var settingsWindow: SettingsWindowController?
 
     /// Where `vault` is currently pointed, so a settings change can tell a vault move from any other
@@ -49,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installHotkey()
         startWatching()
         applyLaunchAtLogin()
+        startGitSync()
 
         settings.onChange = { [weak self] new in self?.settingsChanged(new) }
         // Decision 12's promise — "changing the hotkey is a one-line edit" — only holds if the edit
@@ -136,6 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Shortening the retention should take effect now rather than at the next launch — the
         // reason someone reaches for that control is usually that they want something gone.
         vault?.purgeDeleted(keepingDays: new.recentlyDeletedDays)
+        gitSync.configure(with: new)
     }
 
     /// Re-says everything that was built in the old language.
@@ -178,7 +181,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self?.plume.flush(trigger: .noteSwitched)
                     self?.vault.drain()
                 },
-                onUpdateStatus: { [weak self] in self?.recordUpdateStatus($0) }
+                onUpdateStatus: { [weak self] in self?.recordUpdateStatus($0) },
+                onSyncNow: { [weak self] in self?.gitSync.syncNow() }
             ) { [weak self] url in
                 guard let self else { return }
                 // Same as the hand-edited path above, and this is the one people actually use: the
@@ -191,6 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.refreshMenuBar()
             }
         }
+        settingsWindow?.syncStatusChanged(gitSync.status)
         settingsWindow?.present()
     }
 
@@ -217,6 +222,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // "enqueued immediately" — see `VaultService.drain`. A draft note exists nowhere but in the
         // buffer until that write lands, which is what makes the difference load-bearing.
         vault?.drain()
+        // After the drain, so the commit includes the text that was just written.
+        gitSync.shutdown()
         state.save()
         watcher?.stop()
     }
@@ -329,6 +336,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func startWatching() {
         watcher?.stop()
         let watcher = VaultWatcher { [weak self] paths in
+            // Git's own bookkeeping is not the notes changing; counting it would have every sync
+            // cycle look like somebody typing.
+            if paths.contains(where: { !$0.contains("/.git/") && !$0.hasSuffix("/.git") }) {
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated { self?.gitSync.vaultDidChange() }
+                }
+            }
             let names = VaultWatcher.noteFilenames(in: paths)
             guard !names.isEmpty else { return }
             DispatchQueue.main.async {
@@ -371,6 +385,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Git sync
+
+    private func startGitSync() {
+        gitSync.beforeCycle = { [weak self] in
+            // What is on screen, on disk, before git reads the folder — and waited for, for the
+            // reason `onWillMoveNotes` waits: `flush` only enqueues.
+            self?.plume.flush(trigger: .reloadPending)
+            self?.vault.drain()
+        }
+        gitSync.onStatusChange = { [weak self] status in
+            self?.menuBar?.setSyncStatus(status)
+            self?.settingsWindow?.syncStatusChanged(status)
+        }
+        gitSync.configure(with: settings.value)
+    }
+
     // MARK: - Menu bar
 
     private func installMenuBarItem() {
@@ -387,6 +417,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar.onActions = { [weak self] in self?.plume.openActions() }
         menuBar.onSettings = { [weak self] in self?.openSettingsWindow() }
         menuBar.onOpenRelease = { NSWorkspace.shared.open(UpdateChecker.releasePage(for: $0)) }
+        menuBar.onSyncNow = { [weak self] in self?.gitSync.syncNow() }
+        menuBar.onOpenSyncSettings = { [weak self] in
+            self?.openSettingsWindow()
+            self?.settingsWindow?.showStorage()
+        }
+        menuBar.noteTitle = { [weak self] in self?.titles[$0] }
+        menuBar.onOpenConflict = { [weak self] file in
+            guard let self else { return }
+            if NoteFilename.isNoteFile(file) {
+                self.plume.summon()
+                self.plume.open(file)
+            } else {
+                NSWorkspace.shared.activateFileViewerSelecting([self.settings.value.vaultURL.appendingPathComponent(file)])
+            }
+        }
+        menuBar.setSyncStatus(gitSync.status)
         // An item installed after a check has already run — the icon can be switched back on in
         // Settings — starts out knowing what the last check found.
         menuBar.setUpdateAvailable(latestAvailableVersion)

@@ -24,10 +24,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let shortcuts: ShortcutsSettingsViewController
     private let about: AboutSettingsViewController
 
+    /// The height every tab fits in, before the Storage tab asks for more (Git's rows).
+    private var baseHeight: CGFloat = 0
+
     init(
         settings: SettingsStore,
         onWillMoveNotes: @escaping () -> Void,
         onUpdateStatus: @escaping (ReleaseCheck.Status) -> Void,
+        onSyncNow: @escaping () -> Void,
         onVaultChanged: @escaping (URL) -> Void
     ) {
         self.settings = settings
@@ -38,6 +42,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         about = AboutSettingsViewController()
         storage.onWillMoveNotes = onWillMoveNotes
         storage.onVaultChanged = onVaultChanged
+        storage.onSyncNow = onSyncNow
         about.onStatus = onUpdateStatus
 
         let tabs = NSTabViewController()
@@ -91,6 +96,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         super.init(window: window)
         window.delegate = self
+        baseHeight = height
+        storage.onContentHeightChanged = { [weak self] in self?.storageNeedsHeight($0) }
     }
 
     @available(*, unavailable)
@@ -116,6 +123,33 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     /// And the panel goes back to floating the moment this window is gone.
     func windowWillClose(_ notification: Notification) {
         PlumePanel.resumeFloating()
+    }
+
+    /// The Storage tab grew — Git's rows opened — or shrank back. The window follows, from its top
+    /// edge, and every tab is told the new size so switching tabs does not resize it again.
+    private func storageNeedsHeight(_ needed: CGFloat) {
+        guard let window, baseHeight > 0 else { return }
+        let target = max(baseHeight, needed.rounded(.up))
+        let size = NSSize(width: SettingsForm.contentWidth, height: target)
+        for controller in [general, storage, appearance, shortcuts, about] as [NSViewController] {
+            controller.preferredContentSize = size
+        }
+        let wanted = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
+        guard abs(wanted.height - window.frame.height) > 0.5 else { return }
+        var frame = window.frame
+        frame.origin.y += frame.height - wanted.height  // the top edge stays where the eye is
+        frame.size = wanted.size
+        window.setFrame(frame, display: true, animate: window.isVisible)
+    }
+
+    /// Git sync's status, for the Storage tab's status row.
+    func syncStatusChanged(_ status: GitSyncStatus?) {
+        storage.syncStatusChanged(status)
+    }
+
+    /// Opens on the Storage tab — where a sync failure is explained.
+    func showStorage() {
+        (contentViewController as? NSTabViewController)?.selectedTabViewItemIndex = 1
     }
 
     /// Pushes a change into every tab, so a value edited on one tab — or in `settings.json` while

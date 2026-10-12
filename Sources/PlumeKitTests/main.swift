@@ -21,6 +21,8 @@ runLinkTargetTests()
 runBuildProfileTests()
 runWelcomeNoteTests()
 runHotkeyPressTests()
+runGitSyncTests()
+runGitSyncMoreTests()
 runLocalizationTests()
 
 exit(Check.finish())
