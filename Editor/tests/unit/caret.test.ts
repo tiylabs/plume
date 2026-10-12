@@ -4,7 +4,6 @@
  * with `|` where it rests. `span:` asks where line's marker span ends: the document with `|` there.
  */
 
-import { EditorSelection } from "@codemirror/state";
 import { placeFor } from "../../src/caret";
 import { markerSpanEnd, notAPlace } from "../../src/blocks";
 import { stateFor, type Case } from "./harness";

@@ -6,7 +6,8 @@
 import { EditorState, EditorSelection } from "@codemirror/state";
 import { ensureSyntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { lineContext, type KeyEdit, type LineContext } from "../../src/keyboard/context";
+import { lineContext, type LineContext } from "../../src/keyboard/context";
+import type { KeyEdit } from "../../src/keyboard/edit";
 import { plumeDialect } from "../../src/dialect";
 
 export interface Case {
