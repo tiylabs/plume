@@ -24,6 +24,8 @@ let package = Package(
         // Not a .testTarget: neither XCTest nor swift-testing ships with the Command Line Tools, so
         // `swift test` cannot run without Xcode installed. The suite is an executable instead —
         // `Scripts/test.sh` — which runs anywhere `swift build` does.
-        .executableTarget(name: "PlumeKitTests", dependencies: ["PlumeKit"], exclude: ["Fixtures"]),
+        .executableTarget(
+            name: "PlumeKitTests", dependencies: ["PlumeKit"], path: "Tests/PlumeKitTests", exclude: ["Fixtures"]
+        ),
     ]
 )
