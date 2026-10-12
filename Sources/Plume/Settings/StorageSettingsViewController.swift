@@ -74,7 +74,7 @@ final class StorageSettingsViewController: NSViewController {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    /// `~/Library/Mobile Documents/com~apple~CloudDocs/Plume` — or `…/Plume-scratch` in a debug build.
+    /// `~/Library/Mobile Documents/com~apple~CloudDocs/Plume` — or `…/Plume-dev` in a debug build.
     ///
     /// Built from the literal container name rather than from `url(forUbiquityContainerIdentifier:)`,
     /// which decision 13 measured returning nil here: unsigned means no ubiquity entitlement. The

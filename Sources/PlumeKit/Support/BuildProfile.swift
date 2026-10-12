@@ -23,8 +23,7 @@ public enum BuildProfile: Sendable, Equatable {
     /// A release build: `~/Library/Application Support/Plume`, vault defaults to `~/Documents/Plume`.
     case release
 
-    /// A development build: its own support folder and a vault beside the app bundle.
-    /// A checkout under Documents may need macOS folder-access consent; custom vaults still work.
+    /// A development build: its own support folder and its own vault, `~/Documents/Plume-dev`.
     case scratch
 
     /// Kept for older scratch bundles and the packaging guard that rejects development builds.
@@ -84,18 +83,27 @@ public enum BuildProfile: Sendable, Equatable {
 
     /// Where a fresh install puts the vault. Only ever a *default* — once `settings.json` exists it
     /// carries the answer, and the Storage tab can move it (decision 30).
-    public var defaultVaultPath: String { defaultVaultPath(bundleURL: Bundle.main.bundleURL) }
-
-    /// An absolute sibling path does not depend on the working directory LaunchServices chose.
-    /// Bare probes have no .app beside which to keep notes, so they retain the old safe fallback.
-    public func defaultVaultPath(bundleURL: URL) -> String {
+    ///
+    /// The development vault sits beside the release one rather than inside the checkout. It used to
+    /// live in `build/`, next to the app, which made `make clean` a hazard: removing build products
+    /// meant removing the notes, so the clean rule had to be taught to step around them. Notes are
+    /// not a build product, and the answer does not depend on where the checkout is or which
+    /// directory LaunchServices started the app in.
+    public var defaultVaultPath: String {
         switch self {
-        case .release: return "~/Documents/Plume"
-        case .scratch:
-            guard bundleURL.pathExtension == "app" else { return "~/Plume-scratch" }
-            return bundleURL.deletingLastPathComponent()
-                .appendingPathComponent("Plume-scratch", isDirectory: true).standardizedFileURL.path
+        case .release: "~/Documents/Plume"
+        case .scratch: "~/Documents/Plume-dev"
         }
+    }
+
+    /// `defaultVaultPath` as an absolute URL, with `~` taken from `homeDirectory` so a test can point
+    /// it at a temporary folder instead of the real home.
+    public func defaultVaultURL(
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) -> URL {
+        let path = defaultVaultPath
+        guard path.hasPrefix("~/") else { return URL(fileURLWithPath: path) }
+        return homeDirectory.appendingPathComponent(String(path.dropFirst(2)), isDirectory: true)
     }
 
     /// Where the Sync radio's **iCloud Drive** side puts the vault (decision 133).
@@ -113,7 +121,7 @@ public enum BuildProfile: Sendable, Equatable {
     public var iCloudVaultPath: String {
         switch self {
         case .release: "~/Library/Mobile Documents/com~apple~CloudDocs/Plume"
-        case .scratch: "~/Library/Mobile Documents/com~apple~CloudDocs/Plume-scratch"
+        case .scratch: "~/Library/Mobile Documents/com~apple~CloudDocs/Plume-dev"
         }
     }
 }

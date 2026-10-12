@@ -35,13 +35,5 @@ build: $(EDITOR_DIR)/node_modules ## Release build of build/Plume.app (host arch
 editor: $(EDITOR_DIR)/node_modules ## Rebuild only the web editor bundle
 	cd $(EDITOR_DIR) && node build.mjs
 
-clean: ## Remove build outputs while preserving build/Plume-scratch notes
-	rm -rf .build $(EDITOR_DIR)/dist
-	@if [ -L build ]; then rm build; \
-	elif [ -d build ]; then \
-		for path in build/* build/.[!.]* build/..?*; do \
-			[ "$$path" = "build/Plume-scratch" ] && continue; \
-			[ -e "$$path" ] || [ -L "$$path" ] || continue; \
-			rm -rf "$$path" || exit $$?; \
-		done; \
-	fi
+clean: ## Remove build outputs
+	rm -rf .build build $(EDITOR_DIR)/dist

@@ -49,9 +49,9 @@ verify(BuildProfile.current == expected, "bundle profile is wrong")
 let defaults = Settings()
 verify(defaults.vaultPath == expected.defaultVaultPath, "default vault is wrong")
 if expected == .scratch {
-    let sibling = Bundle.main.bundleURL.deletingLastPathComponent()
-        .appendingPathComponent("Plume-scratch").standardizedFileURL.path
-    verify(defaults.vaultPath == sibling, "development vault is not beside the app")
+    // A fixed folder beside the release one: not inside the checkout, so `make clean` cannot reach it.
+    verify(defaults.vaultPath == "~/Documents/Plume-dev", "development vault is not ~/Documents/Plume-dev")
+    verify(!defaults.vaultPath.contains("build"), "development vault is inside a build directory")
 } else {
     verify(defaults.vaultPath == "~/Documents/Plume", "release vault changed")
 }
@@ -97,29 +97,26 @@ root, temporary = map(pathlib.Path, sys.argv[1:])
 fixture = temporary / 'clean-fixture'
 fixture.mkdir()
 shutil.copyfile(root / 'Makefile', fixture / 'Makefile')
-notes = fixture / 'build/Plume-scratch'
-notes.mkdir(parents=True)
-(notes / 'note.md').write_text('# Keep this note')
-(notes / '.hidden-note').write_text('keep hidden content')
+# Notes a user keeps elsewhere and has linked into build/ are not build products: `rm -rf` removes
+# the link and must not follow it.
 external = temporary / 'external-notes'
 external.mkdir()
 (external / 'note.md').write_text('# External note')
+(fixture / 'build').mkdir()
 (fixture / 'build/external-link').symlink_to(external, target_is_directory=True)
 for path in ['build/Plume.app', 'build/Plume Dev.app', 'build/.hidden-output', '.build', 'Editor/dist']:
     (fixture / path).mkdir(parents=True)
 subprocess.run(['make', '-s', '-C', str(fixture), 'clean'], check=True)
-assert (notes / 'note.md').read_text() == '# Keep this note'
-assert (notes / '.hidden-note').read_text() == 'keep hidden content'
-assert (external / 'note.md').read_text() == '# External note'
-assert list((fixture / 'build').iterdir()) == [notes]
+assert not (fixture / 'build').exists(), 'build/ should be gone'
 assert not (fixture / '.build').exists() and not (fixture / 'Editor/dist').exists()
-# Repeated clean is harmless, and a scratch symlink must retain its target too.
+assert (external / 'note.md').read_text() == '# External note', 'clean followed a symlink'
+# Repeated clean is harmless, and a build/ that is itself a symlink loses the link, not its target.
 subprocess.run(['make', '-s', '-C', str(fixture), 'clean'], check=True)
-shutil.rmtree(notes)
-notes.symlink_to(external, target_is_directory=True)
+(fixture / 'build').symlink_to(external, target_is_directory=True)
 subprocess.run(['make', '-s', '-C', str(fixture), 'clean'], check=True)
-assert notes.is_symlink() and (notes / 'note.md').read_text() == '# External note'
-print('✓ make clean removes build products while preserving scratch notes and symlink targets')
+assert not (fixture / 'build').is_symlink() and not (fixture / 'build').exists()
+assert (external / 'note.md').read_text() == '# External note', 'clean removed a symlink target'
+print('✓ make clean removes build/, .build and Editor/dist, and never follows a symlink out of them')
 PY
 
 # Fail before staging a DMG, on either dev identity or the legacy scratch marker.

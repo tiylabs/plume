@@ -128,86 +128,117 @@ func runBuildProfileTests() {
             }
         }
 
-        Check.test("development notes are an absolute sibling of the app") {
-            let app = URL(fileURLWithPath: "/checkout/build/Plume Dev.app")
-            Check.equal(BuildProfile.scratch.defaultVaultPath(bundleURL: app), "/checkout/build/Plume-scratch")
-            Check.equal(BuildProfile.release.defaultVaultPath(bundleURL: app), "~/Documents/Plume")
-            let other = URL(fileURLWithPath: "/other checkout/build/Plume Dev.app")
-            Check.equal(BuildProfile.scratch.defaultVaultPath(bundleURL: other),
-                        "/other checkout/build/Plume-scratch")
-            Check.equal(BuildProfile.scratch.defaultVaultPath(bundleURL: URL(fileURLWithPath: "/probe")),
-                        "~/Plume-scratch")
+        // The development vault used to be `build/Plume-scratch`, beside the app, which made `make
+        // clean` a hazard to the notes. It is now a fixed folder beside the release one, and it does
+        // not depend on where the app bundle happens to be.
+        Check.test("development notes default to ~/Documents/Plume-dev wherever the app is") {
+            Check.equal(BuildProfile.scratch.defaultVaultPath, "~/Documents/Plume-dev")
+            Check.equal(BuildProfile.release.defaultVaultPath, "~/Documents/Plume")
+            let home = URL(fileURLWithPath: "/Users/someone")
+            Check.equal(BuildProfile.scratch.defaultVaultURL(homeDirectory: home).path,
+                        "/Users/someone/Documents/Plume-dev")
+            Check.equal(BuildProfile.release.defaultVaultURL(homeDirectory: home).path,
+                        "/Users/someone/Documents/Plume")
+            Check.expect(
+                !BuildProfile.scratch.defaultVaultPath.contains("build"),
+                "the dev vault must not live in a build directory that `make clean` removes"
+            )
         }
 
-        Check.test("legacy development notes are copied intact and the source is retained") {
+        /// A scratch app, a home directory and the two places a dev build used to keep its notes.
+        func withLegacyLayout(_ body: (_ root: URL, _ home: URL, _ app: URL) throws -> Void) {
             let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             defer { try? FileManager.default.removeItem(at: root) }
             do {
-                let home = root.appendingPathComponent("home")
+                try body(root, root.appendingPathComponent("home"), root.appendingPathComponent("checkout/build/Plume Dev.app"))
+            } catch { Check.expect(false, "fixture failed: \(error)") }
+        }
+        func makeNote(in folder: URL, _ text: String) throws {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: folder.appendingPathComponent("note.md"))
+        }
+        func read(_ folder: URL) -> String? {
+            try? String(contentsOf: folder.appendingPathComponent("note.md"), encoding: .utf8)
+        }
+
+        Check.test("notes in ~/Plume-scratch are copied to ~/Documents/Plume-dev and the source is retained") {
+            withLegacyLayout { _, home, app in
                 let legacy = home.appendingPathComponent("Plume-scratch")
-                try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
-                try Data("# Old scratch note".utf8).write(to: legacy.appendingPathComponent("note.md"))
-                let app = root.appendingPathComponent("build/Plume Dev.app")
+                try makeNote(in: legacy, "# Old scratch note")
                 var settings = Settings(vaultPath: "~/Plume-scratch")
                 try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
-                Check.equal(settings.vaultPath, root.appendingPathComponent("build/Plume-scratch").path)
-                Check.equal(try String(contentsOf: settings.vaultURL.appendingPathComponent("note.md"), encoding: .utf8),
-                            "# Old scratch note")
-                Check.expect(FileManager.default.fileExists(atPath: legacy.appendingPathComponent("note.md").path))
+                let destination = home.appendingPathComponent("Documents/Plume-dev")
+                Check.equal(settings.vaultPath, destination.path)
+                Check.equal(read(destination), "# Old scratch note")
+                Check.equal(read(legacy), "# Old scratch note", "the source is a backup and stays")
                 // A repeat neither overwrites the new note nor recopies a modified legacy source.
                 try Data("# Changed legacy".utf8).write(to: legacy.appendingPathComponent("note.md"))
                 try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
-                Check.equal(try String(contentsOf: settings.vaultURL.appendingPathComponent("note.md"), encoding: .utf8),
-                            "# Old scratch note")
-            } catch { Check.expect(false, "migration failed: \(error)") }
+                Check.equal(read(destination), "# Old scratch note")
+            }
         }
 
-        Check.test("migration preserves existing destinations, custom paths and release settings") {
-            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-            defer { try? FileManager.default.removeItem(at: root) }
-            do {
-                let home = root.appendingPathComponent("home")
-                let legacy = home.appendingPathComponent("Plume-scratch")
-                let destination = root.appendingPathComponent("build/Plume-scratch")
-                try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
-                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-                try Data("# Existing destination".utf8).write(to: destination.appendingPathComponent("note.md"))
-                let app = root.appendingPathComponent("build/Plume Dev.app")
+        Check.test("notes in build/Plume-scratch beside the app are migrated too") {
+            withLegacyLayout { root, home, app in
+                let legacy = root.appendingPathComponent("checkout/build/Plume-scratch")
+                try makeNote(in: legacy, "# Beside the app")
                 var settings = Settings(vaultPath: legacy.path)
                 try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
-                Check.equal(settings.vaultPath, legacy.path)
-                Check.equal(try String(contentsOf: destination.appendingPathComponent("note.md"), encoding: .utf8),
-                            "# Existing destination")
+                let destination = home.appendingPathComponent("Documents/Plume-dev")
+                Check.equal(settings.vaultPath, destination.path)
+                Check.equal(read(destination), "# Beside the app")
+                Check.equal(read(legacy), "# Beside the app", "and the source stays")
+            }
+        }
+
+        Check.test("a different checkout's build/Plume-scratch is not this app's old default") {
+            withLegacyLayout { root, home, app in
+                let other = root.appendingPathComponent("elsewhere/build/Plume-scratch")
+                try makeNote(in: other, "# Somebody else's")
+                var settings = Settings(vaultPath: other.path)
+                try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
+                Check.equal(settings.vaultPath, other.path)
+                Check.expect(!FileManager.default.fileExists(
+                    atPath: home.appendingPathComponent("Documents/Plume-dev").path))
+            }
+        }
+
+        Check.test("migration never merges into an existing destination, and leaves custom paths and release alone") {
+            withLegacyLayout { _, home, app in
+                let legacy = home.appendingPathComponent("Plume-scratch")
+                let destination = home.appendingPathComponent("Documents/Plume-dev")
+                try makeNote(in: legacy, "# Legacy")
+                try makeNote(in: destination, "# Existing destination")
+                var settings = Settings(vaultPath: legacy.path)
+                try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
+                Check.equal(settings.vaultPath, legacy.path, "the configured vault stays where it was")
+                Check.equal(read(destination), "# Existing destination", "and the destination is untouched")
                 settings.vaultPath = "~/CustomNotes"
                 try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
                 Check.equal(settings.vaultPath, "~/CustomNotes")
                 settings.vaultPath = "~/Plume-scratch"
                 try settings.migrateDevelopmentVault(profile: .release, bundleURL: app, homeDirectory: home)
                 Check.equal(settings.vaultPath, "~/Plume-scratch")
-            } catch { Check.expect(false, "migration checks failed: \(error)") }
+            }
         }
 
         Check.test("missing or failed legacy migration leaves settings untouched") {
-            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-            defer { try? FileManager.default.removeItem(at: root) }
-            do {
-                let home = root.appendingPathComponent("home")
-                let app = root.appendingPathComponent("build/Plume Dev.app")
+            withLegacyLayout { _, home, app in
                 var settings = Settings(vaultPath: "~/Plume-scratch")
                 try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
-                Check.equal(settings.vaultPath, "~/Plume-scratch")
+                Check.equal(settings.vaultPath, "~/Plume-scratch", "no source folder: nothing to move")
                 let legacy = home.appendingPathComponent("Plume-scratch")
-                try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
-                try Data("# Retained".utf8).write(to: legacy.appendingPathComponent("note.md"))
-                try Data("blocks parent creation".utf8).write(to: root.appendingPathComponent("build"))
+                try makeNote(in: legacy, "# Retained")
+                // A file where the destination's parent folder should be makes the copy impossible.
+                try Data("blocks parent creation".utf8).write(to: home.appendingPathComponent("Documents"))
                 do {
                     try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
                     Check.expect(false, "migration should fail when the parent is a file")
                 } catch {
                     Check.equal(settings.vaultPath, "~/Plume-scratch")
-                    Check.expect(FileManager.default.fileExists(atPath: legacy.appendingPathComponent("note.md").path))
+                    Check.equal(read(legacy), "# Retained")
                 }
-            } catch { Check.expect(false, "fixture setup failed: \(error)") }
+            }
         }
 
         // A test binary, a probe and anything else without the Info.plist key is a release build.

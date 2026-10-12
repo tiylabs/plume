@@ -543,20 +543,37 @@ public struct Settings: Codable, Equatable, Sendable {
         checkForUpdates = false
     }
 
-    /// Copy the old default once, preserving the source as a backup. A populated destination may
-    /// belong to another checkout using the shared dev settings, so never merge or overwrite it.
+    /// The two places a development build used to keep its notes by default: `~/Plume-scratch`, and
+    /// `Plume-scratch` beside the app bundle (which is `build/Plume-scratch` in a checkout).
+    private static func legacyDevelopmentVaults(bundleURL: URL, homeDirectory: URL) -> [URL] {
+        var vaults = [homeDirectory.appendingPathComponent("Plume-scratch", isDirectory: true)]
+        if bundleURL.pathExtension == "app" {
+            vaults.append(
+                bundleURL.deletingLastPathComponent()
+                    .appendingPathComponent("Plume-scratch", isDirectory: true)
+            )
+        }
+        return vaults
+    }
+
+    /// Copy an old default development vault to `~/Documents/Plume-dev` once, preserving the source
+    /// as a backup. A populated destination may belong to another checkout using the shared dev
+    /// settings, so never merge or overwrite it — the configured path simply stays where it is.
     /// Missing source folders retain their path so the usual missing-vault recovery still applies.
+    /// Only a `vaultPath` that *is* one of the old defaults is touched; a path the user chose is not.
     public mutating func migrateDevelopmentVault(
         profile: BuildProfile = .current,
         bundleURL: URL = Bundle.main.bundleURL,
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         fileManager: FileManager = .default
     ) throws {
-        guard profile == .scratch, bundleURL.pathExtension == "app" else { return }
-        let legacy = homeDirectory.appendingPathComponent("Plume-scratch", isDirectory: true)
-        let configured = vaultPath == "~/Plume-scratch" ? legacy : vaultURL
-        guard configured.standardizedFileURL == legacy.standardizedFileURL else { return }
-        let destination = URL(fileURLWithPath: profile.defaultVaultPath(bundleURL: bundleURL))
+        guard profile == .scratch else { return }
+        let candidates = Self.legacyDevelopmentVaults(bundleURL: bundleURL, homeDirectory: homeDirectory)
+        let configured = vaultPath == "~/Plume-scratch" ? candidates[0] : vaultURL
+        guard let legacy = candidates.first(where: {
+            $0.standardizedFileURL == configured.standardizedFileURL
+        }) else { return }
+        let destination = profile.defaultVaultURL(homeDirectory: homeDirectory)
         guard destination.standardizedFileURL != legacy.standardizedFileURL,
               !fileManager.fileExists(atPath: destination.path) else { return }
         var isDirectory: ObjCBool = false
@@ -565,7 +582,7 @@ public struct Settings: Codable, Equatable, Sendable {
 
         let parent = destination.deletingLastPathComponent()
         try fileManager.createDirectory(at: parent, withIntermediateDirectories: true)
-        let staging = parent.appendingPathComponent(".Plume-scratch-migration-\(UUID().uuidString)")
+        let staging = parent.appendingPathComponent(".Plume-dev-migration-\(UUID().uuidString)")
         defer { try? fileManager.removeItem(at: staging) }
         try fileManager.copyItem(at: legacy, to: staging)
         try fileManager.moveItem(at: staging, to: destination)
