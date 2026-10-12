@@ -12,8 +12,9 @@ $(EDITOR_DIR)/node_modules: $(EDITOR_DIR)/package-lock.json
 	cd $(EDITOR_DIR) && npm ci
 	@touch $@
 
-lint: $(EDITOR_DIR)/node_modules ## Typecheck the editor (tsc) and run SwiftLint if installed
+lint: $(EDITOR_DIR)/node_modules ## Typecheck the editor (tsc), check doc references, run SwiftLint if installed
 	cd $(EDITOR_DIR) && npm run --silent typecheck
+	Scripts/check-doc-refs.sh
 	@if command -v swiftlint >/dev/null 2>&1; then swiftlint lint --quiet; \
 	else echo "swiftlint not installed, skipping (brew install swiftlint)"; fi
 

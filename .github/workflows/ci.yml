@@ -67,6 +67,10 @@ jobs:
 
       # Errors fail the build (the length ratchet in .swiftlint.yml); the handful of warnings the
       # code already had do not.
+      # Comments may not cite documents this repository does not contain; the count only goes down.
+      - name: Check references to unpublished documents
+        run: Scripts/check-doc-refs.sh
+
       - name: Lint Swift
         run: |
           brew install swiftlint
