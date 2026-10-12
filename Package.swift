@@ -19,6 +19,7 @@ let package = Package(
     targets: [
         .target(name: "PlumeKit"),
         .executableTarget(name: "Plume", dependencies: ["PlumeKit"]),
+        .executableTarget(name: "DockSpaceProbe", dependencies: ["PlumeKit"], path: "Tools/DockSpaceProbe"),
 
         // Not a .testTarget: neither XCTest nor swift-testing ships with the Command Line Tools, so
         // `swift test` cannot run without Xcode installed. The suite is an executable instead —

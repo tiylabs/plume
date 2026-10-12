@@ -41,7 +41,7 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 
-import { mountActionPanel } from "./action-panel";
+import { mountActionPanel, type SpaceAssignmentState, type DockSpaceAssignmentState } from "./action-panel";
 import { placeOverlay } from "./overlay";
 import { describe, hideTooltip, mountTooltips, setPointer } from "./tooltip";
 import { findHighlighting, mountFind } from "./find";
@@ -99,7 +99,8 @@ type OutboundMessage =
   | { type: "exportNote"; text: string }
   | { type: "toggleHideFromCapture" }
   | { type: "toggleAutoSizing" }
-  | { type: "toggleSpaceBehaviour" }
+  /** ⌘K's Assign to Desktop: `Settings.SpaceAssignment`'s raw value. Swift works out the desktop. */
+  | { type: "setSpaceAssignment"; mode: string }
   | { type: "toggleKeepOnTop" }
   | { type: "toggleFooterCount" }
   | { type: "duplicateNote"; text: string }
@@ -608,7 +609,8 @@ const actionHandlers: Record<string, () => boolean> = {
   exportNote: () => (send({ type: "exportNote", text: view.state.doc.toString() }), true),
   hideFromCapture: () => (send({ type: "toggleHideFromCapture" }), true),
   autoSizing: () => (send({ type: "toggleAutoSizing" }), true),
-  spaceBehaviour: () => (send({ type: "toggleSpaceBehaviour" }), true),
+  // A three-way setting's key opens on its three choices rather than stepping through them blind.
+  spaceBehaviour: () => (openSpaceAssignment(), true),
   duplicateNote: () => (send({ type: "duplicateNote", text: view.state.doc.toString() }), true),
   recentlyDeleted: () => (switcher.openDeleted(), true),
   renameFile: () => (send({ type: "renameFile" }), true),
@@ -879,7 +881,9 @@ let hiddenFromCapture = false;
 /** Likewise window state, and it changes without this layer being asked: dragging the panel turns it
  *  off (decision 40). Only ever set from Swift. */
 let autoSizing = true;
-let onEverySpace = true;
+/** Which desktop the panel is assigned to. Swift's to decide — the page cannot see Spaces. */
+let spaceAssignment: SpaceAssignmentState = { mode: "unassigned", desktop: null, canKeepToOne: false };
+let dockSpaceAssignment: DockSpaceAssignmentState = { mode: "checking", desktop: null };
 
 const actionsEl = document.getElementById("actions") as HTMLElement;
 const switcherEl = document.getElementById("switcher") as HTMLElement;
@@ -901,8 +905,10 @@ const actions = mountActionPanel({
   isPinned: () => plumeEl.hasAttribute("data-pinned"),
   isHiddenFromCapture: () => hiddenFromCapture,
   isAutoSizing: () => autoSizing,
-  isOnEverySpace: () => onEverySpace,
+  spaceAssignment: () => spaceAssignment,
+  dockSpaceAssignment: () => dockSpaceAssignment,
   run: (id) => actionHandlers[id]?.(),
+  chooseSpace: (mode) => send({ type: "setSpaceAssignment", mode }),
   // The keys a row prints come from the bindings in force, not from a literal beside the label.
   // They were literals, so rebinding New Note in the Shortcuts tab left ⌘K still advertising ⌘N —
   // which is exactly what decision 17 forbids: "a row cannot advertise a key that does something
@@ -943,6 +949,11 @@ function toggleSwitcher(): void {
 function toggleActions(): void {
   switcher.close();
   actions.toggle();
+}
+
+function openSpaceAssignment(): void {
+  switcher.close();
+  actions.openSpaceAssignment();
 }
 
 /* Clicking outside an open overlay closes it and never reaches the note. `mousedown`, prevented: by
@@ -1192,8 +1203,15 @@ const host = {
     refreshChromeTooltips();
   },
 
-  setOnEverySpace(on: boolean): void {
-    onEverySpace = on;
+  setSpaceAssignment(mode: string, desktop: number | null, canKeepToOne: boolean): void {
+    spaceAssignment = { mode, desktop, canKeepToOne };
+    actions.refresh();
+  },
+
+  setDockSpaceAssignment(mode: DockSpaceAssignmentState["mode"], desktop: number | null): void {
+    if (dockSpaceAssignment.mode === mode && dockSpaceAssignment.desktop === desktop) return;
+    dockSpaceAssignment = { mode, desktop };
+    actions.refresh();
   },
 
   setAutoSizing(on: boolean): void {

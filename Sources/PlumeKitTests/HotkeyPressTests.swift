@@ -47,6 +47,24 @@ func runHotkeyPressTests() {
             )
         }
 
+        Check.test("a panel kept to another desktop stays there, whatever else is true") {
+            for mode in modes {
+                for up in [true, false] {
+                    for space in [true, false] {
+                        for focus in [true, false] {
+                            Check.equal(
+                                HotkeyPress.resolve(
+                                    isUp: up, onActiveSpace: space, hasFocus: focus, dismissMode: mode,
+                                    keptElsewhere: true
+                                ),
+                                .elsewhere
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         Check.test("Esc only: the hotkey never hides the panel") {
             Check.equal(
                 HotkeyPress.resolve(isUp: true, onActiveSpace: true, hasFocus: true, dismissMode: .escapeOnly),
