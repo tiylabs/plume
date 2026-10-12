@@ -22,7 +22,7 @@ const TARGET = "safari17";
 /**
  * `virtual:locales` — every language's `editor.*` strings, read from `../Locales` at build time.
  *
- * The catalogs are the same JSON files the Swift side reads (`Sources/PlumeKit/Localization.swift`),
+ * The catalogs are the same JSON files the Swift side reads (`Sources/PlumeKit/Support/Localization.swift`),
  * which is what stops the two halves of the interface drifting. Only `editor.*` keys are bundled:
  * the rest are Swift's, and shipping them here would be dead weight in a single-file page.
  *

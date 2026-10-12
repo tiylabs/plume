@@ -77,7 +77,8 @@ if expected == .release {
 }
 print("✓ \(expected.displayName): bundle-resolved paths, defaults, hotkey fallback and settings isolation")
 SWIFT
-swiftc Sources/PlumeKit/*.swift "$TMP/main.swift" -o "$TMP/Probe"
+# find, not a glob: PlumeKit is grouped into subdirectories and `*.swift` only matches the top level.
+swiftc $(find Sources/PlumeKit -name '*.swift') "$TMP/main.swift" -o "$TMP/Probe"
 for CHANNEL in release dev; do
     APP="$ROOT/build/Plume.app"
     [[ "$CHANNEL" == "dev" ]] && APP="$ROOT/build/Plume Dev.app"

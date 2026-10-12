@@ -125,7 +125,7 @@ if [[ -d "$ROOT/Themes" ]]; then
 fi
 
 # The interface languages (Locales/<code>/strings.json + welcome.md). Copied whole, so a new language
-# directory ships with no edit here. The Swift side reads them at runtime (PlumeKit/Localization.swift)
+# directory ships with no edit here. The Swift side reads them at runtime (PlumeKit/Support/Localization.swift)
 # and the web bundle has already inlined its `editor.*` half at build time.
 if [[ -d "$ROOT/Locales" ]]; then
 	mkdir -p "$CONTENTS/Resources/Locales"
