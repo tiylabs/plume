@@ -96,7 +96,13 @@ const GROUPS: ActionRow[][] = [
     { id: "browseNotes", svg: `<path d="M4 5h16" /><path d="M4 12h16" /><path d="M4 19h16" />`, keys: ["⌘", "P"] },
   ],
   [
-    { id: "pinPlume", svg: `<path d="M12 17v5" /><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />`, keys: ["⇧", "⌘", "P"] },
+    {
+      id: "pinPlume",
+      // The note's pin, the one the title bar and the switcher already draw for a pinned note. Not
+      // the thumbtack: that is the panel's own Keep on Top, and the two read as one control.
+      svg: `<circle cx="12" cy="8" r="4" /><line x1="12" x2="12" y1="12" y2="21" />`,
+      keys: ["⇧", "⌘", "P"],
+    },
     {
       id: "findInNote",
       svg: `<path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" />`,
@@ -123,8 +129,9 @@ const GROUPS: ActionRow[][] = [
     { id: "formatBar", svg: `<path d="M12 4v16" /><path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2" /><path d="M9 20h6" />`, keys: ["⌥", "⌘", ","] },
     {
       id: "spaceBehaviour",
-      // Two overlapping rectangles: one desktop behind another.
-      svg: `<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />`,
+      // A monitor with its screen split down the middle: the two desktops side by side. Lucide's
+      // `monitor` with a centre line, so it keeps the set's stroke and grid.
+      svg: `<rect width="20" height="14" x="2" y="3" rx="2" /><line x1="12" x2="12" y1="3" y2="17" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" />`,
       keys: ["⌥", "⌘", "S"],
     },
     {
