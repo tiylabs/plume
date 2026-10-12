@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Test PlumeKit
-        run: Scripts/test.sh
+        run: Scripts/test-all.sh --only kit
 
   test-editor:
     if: github.event_name == 'push'
@@ -47,21 +47,12 @@ jobs:
         run: npm ci --no-audit --no-fund
         working-directory: Editor
 
-      # Same five suites as CI. The tag is the moment with the least room for "we'll catch it next
-      # time", and this workflow used to run the Foundation suite alone — so a tag pushed from a
-      # tree CI had never seen shipped with 429 assertions unrun.
-      - name: Build the editor bundle
-        run: node build.mjs
-        working-directory: Editor
-
+      # The same suites as CI, from the same script. The tag is the moment with the least room for
+      # "we'll catch it next time", and this workflow used to run the Foundation suite alone — so a
+      # tag pushed from a tree CI had never seen shipped with 429 assertions unrun. The script also
+      # builds the editor bundle that is uploaded below.
       - name: Test the editor
-        run: |
-          set -euo pipefail
-          Scripts/test-keyboard.sh
-          Scripts/test-editor.sh --skip-editor
-          Scripts/test-markdown.sh --skip-editor
-          Scripts/test-switcher.sh --skip-editor
-          Scripts/test-tooltip.sh --skip-editor
+        run: Scripts/test-all.sh --only web
 
       - name: Upload the tested editor bundle
         uses: actions/upload-artifact@v4
