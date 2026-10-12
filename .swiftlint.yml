@@ -2,7 +2,7 @@
 # names, big view controllers). Add rules back as the code is brought in line.
 included:
   - Sources
-  - Tests   # the suite moves here in phase 1; a missing path is ignored
+  - Tests   # the PlumeKit suite (Tests/PlumeKitTests), which has its own nested .swiftlint.yml
 excluded:
   - .build
   - build
