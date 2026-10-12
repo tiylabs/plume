@@ -15,8 +15,9 @@
 #   Scripts/check-doc-refs.sh           check
 #   Scripts/check-doc-refs.sh --list    show every match
 #
-# The count is of matches, not of lines, and covers every tracked text file except .gitignore
-# (whose comment explains why those documents stay local).
+# The count is of matches, not of lines, and covers every tracked text file except two: .gitignore
+# (whose comment explains why those documents stay local) and this script, which has to quote the
+# patterns it looks for.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -25,7 +26,7 @@ BASELINE_FILE=Scripts/doc-refs.baseline
 
 matches() {
 	# `|| true`: grep exits 1 when a file has no match, which is the good case.
-	git ls-files -z | { grep -zv '^\.gitignore$' || true; } | xargs -0 grep -InoE "$PATTERN" 2>/dev/null || true
+	git ls-files -z | { grep -zvE '^(\.gitignore|Scripts/check-doc-refs\.sh)$' || true; } | xargs -0 grep -InoE "$PATTERN" 2>/dev/null || true
 }
 
 if [[ "${1:-}" == "--list" ]]; then
@@ -56,7 +57,7 @@ if [[ "$actual" -gt "$baseline" ]]; then
 	done
 	echo "  Matches added since ${base:-the first commit}:" >&2
 	[[ -n "$base" ]] || base=$(git rev-list --max-parents=0 HEAD | tail -1)
-	git diff -U0 "$base" -- . ':(exclude).gitignore' ':(exclude)docs' \
+	git diff -U0 "$base" -- . ':(exclude).gitignore' ':(exclude)docs' ':(exclude)Scripts/check-doc-refs.sh' \
 		| grep -E '^\+[^+]' | grep -E "$PATTERN" | head -20 >&2 || true
 	exit 1
 elif [[ "$actual" -lt "$baseline" ]]; then
