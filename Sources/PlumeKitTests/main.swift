@@ -25,5 +25,6 @@ runHotkeyPressTests()
 runGitSyncTests()
 runGitSyncMoreTests()
 runLocalizationTests()
+runCompatibilityTests()
 
 exit(Check.finish())

@@ -1,0 +1,8 @@
+{
+  "summonHotkey" : "control+option+space",
+  "shortcuts" : {
+    "pinPlume" : "Shift-Mod-k",
+    "someFutureAction" : "Mod-j"
+  },
+  "someFutureSetting" : { "nested" : [1, 2, 3] }
+}
