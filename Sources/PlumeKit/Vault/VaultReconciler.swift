@@ -7,7 +7,7 @@ import Foundation
 /// notice and must refuse to clobber. The one thing it may never do is stop accepting keystrokes —
 /// a notes panel that goes read-only has failed at the only thing it does, and losing a race to
 /// another machine is not a reason to stop typing on this one.
-public enum VaultSync {
+public enum VaultReconciler {
 
     public enum Reaction: Equatable, Sendable {
         /// The bytes on disk are the bytes we wrote. Our own FSEvents echo; do nothing.

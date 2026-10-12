@@ -10,7 +10,7 @@ import PlumeKit
 /// What it does **not** do is unchanged from decision 94, and the list is the promise: it does not
 /// download, install, or open anything, it sends nothing about the machine, and it never fires on
 /// its own. Both callers are a press or a keypress.
-enum UpdateChecker {
+enum ReleaseFetcher {
 
     static let releasesAPI = URL(string: "https://api.github.com/repos/tiylabs/plume/releases/latest")!
     static let releasesPage = URL(string: "https://github.com/tiylabs/plume/releases")!

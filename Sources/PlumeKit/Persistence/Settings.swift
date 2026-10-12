@@ -535,7 +535,7 @@ public struct Settings: Codable, Equatable, Sendable {
     /// Older scratch settings inherited the release hotkey and background integrations.
     /// Migrate that hotkey while preserving any other custom combination and the existing vault.
     public mutating func isolateDevelopmentSettings(profile: BuildProfile = .current) {
-        guard profile == .scratch else { return }
+        guard profile == .dev else { return }
         if summonHotkey == Hotkey.defaultSummon { summonHotkey = profile.defaultSummonHotkey }
         launchAtLogin = false
         checkForUpdates = false
@@ -565,7 +565,7 @@ public struct Settings: Codable, Equatable, Sendable {
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         fileManager: FileManager = .default
     ) throws {
-        guard profile == .scratch else { return }
+        guard profile == .dev else { return }
         let candidates = Self.legacyDevelopmentVaults(bundleURL: bundleURL, homeDirectory: homeDirectory)
         let configured = vaultPath == "~/Plume-scratch" ? candidates[0] : vaultURL
         guard let legacy = candidates.first(where: {

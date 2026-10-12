@@ -40,7 +40,7 @@ final class MenuBarController: NSObject {
 
         if let button = item.button {
             button.image = Self.statusImage
-            button.toolTip = BuildProfile.current == .scratch
+            button.toolTip = BuildProfile.current == .dev
                 ? "\(BuildProfile.current.displayName) — \(hotkey.displayString)"
                 : tr("menubar.tooltip", ["hotkey": hotkey.displayString])
             button.target = self
@@ -345,7 +345,7 @@ final class MenuBarController: NSObject {
     /// during development: `NSImage(named:)` reads the app bundle, and there isn't one.
     private static let statusImage: NSImage? = {
         let image: NSImage?
-        if BuildProfile.current == .scratch {
+        if BuildProfile.current == .dev {
             image = NSImage(systemSymbolName: "hammer", accessibilityDescription: "Plume Dev")
         } else {
             image = NSImage(named: "MenuBar")

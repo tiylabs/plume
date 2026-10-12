@@ -3,7 +3,7 @@ import PlumeKit
 
 // A diagnostic executable, so testing Dock assignments does not launch Plume or open a real note.
 // Usage: swift run DockSpaceProbe [--bundle ID] [--watch] [--preferences PATH]
-var bundleIdentifiers = [BuildProfile.release.bundleIdentifier, BuildProfile.scratch.bundleIdentifier]
+var bundleIdentifiers = [BuildProfile.release.bundleIdentifier, BuildProfile.dev.bundleIdentifier]
 var preferencesURL: URL?
 var watch = false
 var arguments = Array(CommandLine.arguments.dropFirst())

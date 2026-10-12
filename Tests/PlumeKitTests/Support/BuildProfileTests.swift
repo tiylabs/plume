@@ -17,7 +17,7 @@ func runBuildProfileTests() {
         }
 
         Check.test("dev identity and hotkey are independent of release") {
-            let dev = BuildProfile.scratch
+            let dev = BuildProfile.dev
             Check.notEqual(dev.bundleIdentifier, BuildProfile.release.bundleIdentifier)
             Check.equal(dev.displayName, "Plume Dev")
             Check.equal(dev.defaultSummonHotkey.settingsString, "control+option+shift+space")
@@ -26,8 +26,8 @@ func runBuildProfileTests() {
         }
 
         Check.test("bundle identity or legacy scratch flag selects development") {
-            Check.equal(BuildProfile.resolve(bundleIdentifier: "com.tiylabs.plume.dev", scratchFlag: false), .scratch)
-            Check.equal(BuildProfile.resolve(bundleIdentifier: "com.tiylabs.plume", scratchFlag: true), .scratch)
+            Check.equal(BuildProfile.resolve(bundleIdentifier: "com.tiylabs.plume.dev", scratchFlag: false), .dev)
+            Check.equal(BuildProfile.resolve(bundleIdentifier: "com.tiylabs.plume", scratchFlag: true), .dev)
             Check.equal(BuildProfile.resolve(bundleIdentifier: "com.tiylabs.plume", scratchFlag: false), .release)
             Check.equal(BuildProfile.resolve(bundleIdentifier: nil, scratchFlag: false), .release)
         }
@@ -36,7 +36,7 @@ func runBuildProfileTests() {
             let home = URL(fileURLWithPath: "/test-home")
             Check.equal(BuildProfile.release.fallbackSupportDirectory(homeDirectory: home).path,
                         "/test-home/Library/Application Support/Plume")
-            Check.equal(BuildProfile.scratch.fallbackSupportDirectory(homeDirectory: home).path,
+            Check.equal(BuildProfile.dev.fallbackSupportDirectory(homeDirectory: home).path,
                         "/test-home/Library/Application Support/Plume (Debug)")
         }
 
@@ -45,20 +45,20 @@ func runBuildProfileTests() {
             let original = settings
             settings.isolateDevelopmentSettings(profile: .release)
             Check.equal(settings, original)
-            settings.isolateDevelopmentSettings(profile: .scratch)
+            settings.isolateDevelopmentSettings(profile: .dev)
             Check.equal(settings.vaultPath, original.vaultPath)
-            Check.equal(settings.summonHotkey, BuildProfile.scratch.defaultSummonHotkey)
+            Check.equal(settings.summonHotkey, BuildProfile.dev.defaultSummonHotkey)
             Check.expect(!settings.launchAtLogin)
             Check.expect(!settings.checkForUpdates)
             let migrated = settings
-            settings.isolateDevelopmentSettings(profile: .scratch)
+            settings.isolateDevelopmentSettings(profile: .dev)
             Check.equal(settings, migrated)
         }
 
         Check.test("development migration preserves custom hotkeys") {
             guard let custom = try? Hotkey.parse("command+shift+p") else { return }
             var settings = Settings(summonHotkey: custom)
-            settings.isolateDevelopmentSettings(profile: .scratch)
+            settings.isolateDevelopmentSettings(profile: .dev)
             Check.equal(settings.summonHotkey, custom)
         }
 
@@ -69,11 +69,11 @@ func runBuildProfileTests() {
         Check.test("the two profiles share nothing") {
             Check.expect(
                 BuildProfile.release.supportDirectoryName
-                    != BuildProfile.scratch.supportDirectoryName,
+                    != BuildProfile.dev.supportDirectoryName,
                 "both profiles resolved to the same Application Support folder"
             )
             Check.expect(
-                BuildProfile.release.defaultVaultPath != BuildProfile.scratch.defaultVaultPath,
+                BuildProfile.release.defaultVaultPath != BuildProfile.dev.defaultVaultPath,
                 "both profiles resolved to the same default vault"
             )
             // Added by decision 133, and the reason is this test rather than the bug: it asserted
@@ -81,7 +81,7 @@ func runBuildProfileTests() {
             // so a third path could be added without it — and was. Every location the profile knows
             // about has to differ, which is what the loop below enforces going forward.
             Check.expect(
-                BuildProfile.release.iCloudVaultPath != BuildProfile.scratch.iCloudVaultPath,
+                BuildProfile.release.iCloudVaultPath != BuildProfile.dev.iCloudVaultPath,
                 "both profiles resolved to the same iCloud Drive vault"
             )
         }
@@ -97,9 +97,9 @@ func runBuildProfileTests() {
                 ("iCloud vault", BuildProfile.release.iCloudVaultPath),
             ]
             let scratch: [(String, String)] = [
-                ("support directory", BuildProfile.scratch.supportDirectoryName),
-                ("default vault", BuildProfile.scratch.defaultVaultPath),
-                ("iCloud vault", BuildProfile.scratch.iCloudVaultPath),
+                ("support directory", BuildProfile.dev.supportDirectoryName),
+                ("default vault", BuildProfile.dev.defaultVaultPath),
+                ("iCloud vault", BuildProfile.dev.iCloudVaultPath),
             ]
             for (r, s) in zip(release, scratch) {
                 Check.expect(r.1 != s.1, "\(r.0) is the same folder in both builds: \(r.1)")
@@ -112,15 +112,15 @@ func runBuildProfileTests() {
         // was a silent merge, not an error.
         Check.test("a scratch build's iCloud vault is not the release build's") {
             Check.expect(
-                !BuildProfile.scratch.iCloudVaultPath.hasSuffix("/Plume"),
-                "got \(BuildProfile.scratch.iCloudVaultPath), which is the daily vault"
+                !BuildProfile.dev.iCloudVaultPath.hasSuffix("/Plume"),
+                "got \(BuildProfile.dev.iCloudVaultPath), which is the daily vault"
             )
             Check.expect(
                 BuildProfile.release.iCloudVaultPath.hasSuffix("/Plume"),
                 "the release build must keep the folder people already have their notes in"
             )
             // Both still inside the same iCloud container, so the two Macs can share one account.
-            for path in [BuildProfile.release.iCloudVaultPath, BuildProfile.scratch.iCloudVaultPath] {
+            for path in [BuildProfile.release.iCloudVaultPath, BuildProfile.dev.iCloudVaultPath] {
                 Check.expect(
                     path.contains("Library/Mobile Documents/com~apple~CloudDocs/"),
                     "not in iCloud Drive at all: \(path)"
@@ -132,15 +132,15 @@ func runBuildProfileTests() {
         // clean` a hazard to the notes. It is now a fixed folder beside the release one, and it does
         // not depend on where the app bundle happens to be.
         Check.test("development notes default to ~/Documents/Plume-dev wherever the app is") {
-            Check.equal(BuildProfile.scratch.defaultVaultPath, "~/Documents/Plume-dev")
+            Check.equal(BuildProfile.dev.defaultVaultPath, "~/Documents/Plume-dev")
             Check.equal(BuildProfile.release.defaultVaultPath, "~/Documents/Plume")
             let home = URL(fileURLWithPath: "/Users/someone")
-            Check.equal(BuildProfile.scratch.defaultVaultURL(homeDirectory: home).path,
+            Check.equal(BuildProfile.dev.defaultVaultURL(homeDirectory: home).path,
                         "/Users/someone/Documents/Plume-dev")
             Check.equal(BuildProfile.release.defaultVaultURL(homeDirectory: home).path,
                         "/Users/someone/Documents/Plume")
             Check.expect(
-                !BuildProfile.scratch.defaultVaultPath.contains("build"),
+                !BuildProfile.dev.defaultVaultPath.contains("build"),
                 "the dev vault must not live in a build directory that `make clean` removes"
             )
         }
@@ -166,14 +166,14 @@ func runBuildProfileTests() {
                 let legacy = home.appendingPathComponent("Plume-scratch")
                 try makeNote(in: legacy, "# Old scratch note")
                 var settings = Settings(vaultPath: "~/Plume-scratch")
-                try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
+                try settings.migrateDevelopmentVault(profile: .dev, bundleURL: app, homeDirectory: home)
                 let destination = home.appendingPathComponent("Documents/Plume-dev")
                 Check.equal(settings.vaultPath, destination.path)
                 Check.equal(read(destination), "# Old scratch note")
                 Check.equal(read(legacy), "# Old scratch note", "the source is a backup and stays")
                 // A repeat neither overwrites the new note nor recopies a modified legacy source.
                 try Data("# Changed legacy".utf8).write(to: legacy.appendingPathComponent("note.md"))
-                try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
+                try settings.migrateDevelopmentVault(profile: .dev, bundleURL: app, homeDirectory: home)
                 Check.equal(read(destination), "# Old scratch note")
             }
         }
@@ -183,7 +183,7 @@ func runBuildProfileTests() {
                 let legacy = root.appendingPathComponent("checkout/build/Plume-scratch")
                 try makeNote(in: legacy, "# Beside the app")
                 var settings = Settings(vaultPath: legacy.path)
-                try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
+                try settings.migrateDevelopmentVault(profile: .dev, bundleURL: app, homeDirectory: home)
                 let destination = home.appendingPathComponent("Documents/Plume-dev")
                 Check.equal(settings.vaultPath, destination.path)
                 Check.equal(read(destination), "# Beside the app")
@@ -196,7 +196,7 @@ func runBuildProfileTests() {
                 let other = root.appendingPathComponent("elsewhere/build/Plume-scratch")
                 try makeNote(in: other, "# Somebody else's")
                 var settings = Settings(vaultPath: other.path)
-                try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
+                try settings.migrateDevelopmentVault(profile: .dev, bundleURL: app, homeDirectory: home)
                 Check.equal(settings.vaultPath, other.path)
                 Check.expect(!FileManager.default.fileExists(
                     atPath: home.appendingPathComponent("Documents/Plume-dev").path))
@@ -210,11 +210,11 @@ func runBuildProfileTests() {
                 try makeNote(in: legacy, "# Legacy")
                 try makeNote(in: destination, "# Existing destination")
                 var settings = Settings(vaultPath: legacy.path)
-                try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
+                try settings.migrateDevelopmentVault(profile: .dev, bundleURL: app, homeDirectory: home)
                 Check.equal(settings.vaultPath, legacy.path, "the configured vault stays where it was")
                 Check.equal(read(destination), "# Existing destination", "and the destination is untouched")
                 settings.vaultPath = "~/CustomNotes"
-                try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
+                try settings.migrateDevelopmentVault(profile: .dev, bundleURL: app, homeDirectory: home)
                 Check.equal(settings.vaultPath, "~/CustomNotes")
                 settings.vaultPath = "~/Plume-scratch"
                 try settings.migrateDevelopmentVault(profile: .release, bundleURL: app, homeDirectory: home)
@@ -225,14 +225,14 @@ func runBuildProfileTests() {
         Check.test("missing or failed legacy migration leaves settings untouched") {
             withLegacyLayout { _, home, app in
                 var settings = Settings(vaultPath: "~/Plume-scratch")
-                try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
+                try settings.migrateDevelopmentVault(profile: .dev, bundleURL: app, homeDirectory: home)
                 Check.equal(settings.vaultPath, "~/Plume-scratch", "no source folder: nothing to move")
                 let legacy = home.appendingPathComponent("Plume-scratch")
                 try makeNote(in: legacy, "# Retained")
                 // A file where the destination's parent folder should be makes the copy impossible.
                 try Data("blocks parent creation".utf8).write(to: home.appendingPathComponent("Documents"))
                 do {
-                    try settings.migrateDevelopmentVault(profile: .scratch, bundleURL: app, homeDirectory: home)
+                    try settings.migrateDevelopmentVault(profile: .dev, bundleURL: app, homeDirectory: home)
                     Check.expect(false, "migration should fail when the parent is a file")
                 } catch {
                     Check.equal(settings.vaultPath, "~/Plume-scratch")

@@ -133,7 +133,7 @@ func runNoteNamingTests() {
 
         Check.test("one file with our bytes, and the original gone, is the note") {
             Check.equal(
-                VaultSync.renameTarget(
+                VaultReconciler.renameTarget(
                     of: open,
                     originalIsMissing: true,
                     candidates: ["standup-final.md": hash],
@@ -147,7 +147,7 @@ func runNoteNamingTests() {
         // `VaultIO.write`'s `case .missing: break` wrote the old name back — leaving both files.
         Check.test("the original still being there is not a rename") {
             Check.equal(
-                VaultSync.renameTarget(
+                VaultReconciler.renameTarget(
                     of: open,
                     originalIsMissing: false,
                     candidates: ["standup-final.md": hash],
@@ -159,7 +159,7 @@ func runNoteNamingTests() {
 
         Check.test("two identical files is a copy, and a copy is not followed") {
             Check.equal(
-                VaultSync.renameTarget(
+                VaultReconciler.renameTarget(
                     of: open,
                     originalIsMissing: true,
                     candidates: ["standup-final.md": hash, "standup-copy.md": hash],
@@ -171,7 +171,7 @@ func runNoteNamingTests() {
 
         Check.test("a file with different bytes is somebody else's note") {
             Check.equal(
-                VaultSync.renameTarget(
+                VaultReconciler.renameTarget(
                     of: open,
                     originalIsMissing: true,
                     candidates: ["other.md": ContentHash.of("# Other\n")],
@@ -183,7 +183,7 @@ func runNoteNamingTests() {
 
         Check.test("a burst with nothing in it follows nothing") {
             Check.equal(
-                VaultSync.renameTarget(
+                VaultReconciler.renameTarget(
                     of: open, originalIsMissing: true, candidates: [:], baselineHash: hash
                 ),
                 nil
@@ -193,7 +193,7 @@ func runNoteNamingTests() {
         // A rename *and* an edit is not a rename we can prove, so it is not one we follow.
         Check.test("renamed and edited elsewhere is left alone") {
             Check.equal(
-                VaultSync.renameTarget(
+                VaultReconciler.renameTarget(
                     of: open,
                     originalIsMissing: true,
                     candidates: ["standup-final.md": ContentHash.of("# Standup\nmore\n")],

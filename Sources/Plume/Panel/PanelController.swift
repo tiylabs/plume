@@ -79,7 +79,7 @@ final class PanelController: NSObject {
     private(set) var currentFilename: String?
     private var bufferText = ""
     /// Hash of the bytes we believe are on disk. `nil` means "we have not read this file yet", which
-    /// `VaultSync.react` treats differently from "we read it and it was empty".
+    /// `VaultReconciler.react` treats differently from "we read it and it was empty".
     private var baselineHash: String?
 
     /// The buffer hashed the way `VaultIO.write` will store it — trailing newline normalised.
@@ -1200,7 +1200,7 @@ final class PanelController: NSObject {
             // load, and why Plume's own hash conflict does not cover it.
             self.harvestConflicts(of: current)
 
-            switch VaultSync.react(
+            switch VaultReconciler.react(
                 diskHash: diskHash,
                 baselineHash: self.baselineHash,
                 bufferHash: self.bufferHash

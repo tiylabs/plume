@@ -403,7 +403,7 @@ final class VaultService: @unchecked Sendable {
             }
 
             // The decision itself is pure and lives in PlumeKit, where it is tested.
-            let answer = VaultSync.renameTarget(
+            let answer = VaultReconciler.renameTarget(
                 of: filename, originalIsMissing: missing, candidates: hashes, baselineHash: hash
             )
             DispatchQueue.main.async { MainActor.assumeIsolated { completion(answer) } }

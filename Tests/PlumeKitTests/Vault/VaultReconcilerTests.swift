@@ -1,7 +1,7 @@
 import Foundation
 import PlumeKit
 
-func runVaultSyncTests() {
+func runVaultReconcilerTests() {
     Check.suite("Content hashing") {
 
         Check.test("hashes bytes, not characters") {
@@ -33,58 +33,58 @@ func runVaultSyncTests() {
         Check.test("our own write comes back as an echo and is ignored") {
             // The FSEvents callback fires for the write we just made. Nothing has happened.
             Check.equal(
-                VaultSync.react(disk: ourEdit, baseline: ourEdit, buffer: ourEdit),
-                VaultSync.Reaction.noChange
+                VaultReconciler.react(disk: ourEdit, baseline: ourEdit, buffer: ourEdit),
+                VaultReconciler.Reaction.noChange
             )
         }
 
         Check.test("an unsaved edit against an unchanged disk is not a conflict") {
             // Typing has outrun the 500 ms debounce. That is the normal state of the app.
             Check.equal(
-                VaultSync.react(disk: original, baseline: original, buffer: ourEdit),
-                VaultSync.Reaction.noChange
+                VaultReconciler.react(disk: original, baseline: original, buffer: ourEdit),
+                VaultReconciler.Reaction.noChange
             )
         }
 
         Check.test("an external edit with a clean buffer reloads silently") {
             // Nothing to lose, so a prompt would be noise.
             Check.equal(
-                VaultSync.react(disk: theirEdit, baseline: original, buffer: original),
-                VaultSync.Reaction.reload
+                VaultReconciler.react(disk: theirEdit, baseline: original, buffer: original),
+                VaultReconciler.Reaction.reload
             )
         }
 
         Check.test("an external edit with unsaved work writes a sibling instead of clobbering") {
             // The case decision 8 exists for. Neither version may be lost.
             Check.equal(
-                VaultSync.react(disk: theirEdit, baseline: original, buffer: ourEdit),
-                VaultSync.Reaction.writeConflictSibling
+                VaultReconciler.react(disk: theirEdit, baseline: original, buffer: ourEdit),
+                VaultReconciler.Reaction.writeConflictSibling
             )
         }
 
         Check.test("converging on the same bytes is not a conflict") {
             // Another machine happened to write exactly what we have. Nothing to reconcile.
             Check.equal(
-                VaultSync.react(disk: ourEdit, baseline: original, buffer: ourEdit),
-                VaultSync.Reaction.adoptBaseline
+                VaultReconciler.react(disk: ourEdit, baseline: original, buffer: ourEdit),
+                VaultReconciler.Reaction.adoptBaseline
             )
         }
 
         Check.test("a file we have never seen before is simply read") {
             Check.equal(
-                VaultSync.react(disk: original, baseline: nil, buffer: ""),
-                VaultSync.Reaction.reload
+                VaultReconciler.react(disk: original, baseline: nil, buffer: ""),
+                VaultReconciler.Reaction.reload
             )
             Check.equal(
-                VaultSync.react(disk: original, baseline: nil, buffer: original),
-                VaultSync.Reaction.adoptBaseline
+                VaultReconciler.react(disk: original, baseline: nil, buffer: original),
+                VaultReconciler.Reaction.adoptBaseline
             )
         }
 
         Check.test("no reaction ever makes the panel read-only") {
             // Enumerated deliberately: if a future case is added, this test should be revisited on
             // purpose rather than quietly passing. A panel that stops accepting keystrokes has failed.
-            let all: [VaultSync.Reaction] = [
+            let all: [VaultReconciler.Reaction] = [
                 .ignoreEcho, .noChange, .reload, .writeConflictSibling, .adoptBaseline,
             ]
             Check.equal(all.count, 5, "a new reaction was added — does it keep the panel editable?")

@@ -421,7 +421,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar.onBrowse = { [weak self] in self?.panelController.openSwitcher() }
         menuBar.onActions = { [weak self] in self?.panelController.openActions() }
         menuBar.onSettings = { [weak self] in self?.openSettingsWindow() }
-        menuBar.onOpenRelease = { NSWorkspace.shared.open(UpdateChecker.releasePage(for: $0)) }
+        menuBar.onOpenRelease = { NSWorkspace.shared.open(ReleaseFetcher.releasePage(for: $0)) }
         menuBar.onSyncNow = { [weak self] in self?.gitSync.syncNow() }
         menuBar.onOpenSyncSettings = { [weak self] in
             self?.openSettingsWindow()
@@ -461,7 +461,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var latestAvailableVersion: String? {
         guard BuildProfile.current.allowsSystemIntegration else { return nil }
         return ReleaseCheck.pending(
-            remembered: state.value.availableUpdate, running: UpdateChecker.runningVersion
+            remembered: state.value.availableUpdate, running: ReleaseFetcher.runningVersion
         )
     }
 
@@ -489,7 +489,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // asks once a day rather than on every summon.
         state.update { $0.lastUpdateCheck = Date() }
 
-        UpdateChecker.fetchStatus { [weak self] status in
+        ReleaseFetcher.fetchStatus { [weak self] status in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     guard let self else { return }

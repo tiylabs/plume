@@ -24,7 +24,7 @@ public enum BuildProfile: Sendable, Equatable {
     case release
 
     /// A development build: its own support folder and its own vault, `~/Documents/Plume-dev`.
-    case scratch
+    case dev
 
     /// Kept for older scratch bundles and the packaging guard that rejects development builds.
     public static let infoKey = "PlumeScratchBuild"
@@ -35,28 +35,28 @@ public enum BuildProfile: Sendable, Equatable {
     )
 
     public static func resolve(bundleIdentifier: String?, scratchFlag: Bool) -> BuildProfile {
-        if bundleIdentifier == BuildProfile.scratch.bundleIdentifier || scratchFlag { return .scratch }
+        if bundleIdentifier == BuildProfile.dev.bundleIdentifier || scratchFlag { return .dev }
         return .release
     }
 
     public var bundleIdentifier: String {
         switch self {
         case .release: "com.tiylabs.plume"
-        case .scratch: "com.tiylabs.plume.dev"
+        case .dev: "com.tiylabs.plume.dev"
         }
     }
 
     public var displayName: String {
         switch self {
         case .release: "Plume"
-        case .scratch: "Plume Dev"
+        case .dev: "Plume Dev"
         }
     }
 
     public var defaultSummonHotkey: Hotkey {
         switch self {
         case .release: .defaultSummon
-        case .scratch: Hotkey(keyCode: KeyCode.space, modifiers: [.control, .option, .shift])
+        case .dev: Hotkey(keyCode: KeyCode.space, modifiers: [.control, .option, .shift])
         }
     }
 
@@ -77,7 +77,7 @@ public enum BuildProfile: Sendable, Equatable {
     public var supportDirectoryName: String {
         switch self {
         case .release: "Plume"
-        case .scratch: "Plume (Debug)"
+        case .dev: "Plume (Debug)"
         }
     }
 
@@ -92,7 +92,7 @@ public enum BuildProfile: Sendable, Equatable {
     public var defaultVaultPath: String {
         switch self {
         case .release: "~/Documents/Plume"
-        case .scratch: "~/Documents/Plume-dev"
+        case .dev: "~/Documents/Plume-dev"
         }
     }
 
@@ -121,7 +121,7 @@ public enum BuildProfile: Sendable, Equatable {
     public var iCloudVaultPath: String {
         switch self {
         case .release: "~/Library/Mobile Documents/com~apple~CloudDocs/Plume"
-        case .scratch: "~/Library/Mobile Documents/com~apple~CloudDocs/Plume-dev"
+        case .dev: "~/Library/Mobile Documents/com~apple~CloudDocs/Plume-dev"
         }
     }
 }

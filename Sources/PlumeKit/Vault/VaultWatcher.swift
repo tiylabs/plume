@@ -7,7 +7,7 @@ import Foundation
 /// needs no window server, so it can be exercised by the suite like everything else here.
 ///
 /// What this deliberately does **not** do is decide what a change *means*. It reports paths; the
-/// caller compares content hashes and asks `VaultSync` (decision 10 — echoes are filtered by hash,
+/// caller compares content hashes and asks `VaultReconciler` (decision 10 — echoes are filtered by hash,
 /// never by mtime). Keeping the two apart is what makes the interesting half testable without a
 /// filesystem event ever firing.
 public final class VaultWatcher {

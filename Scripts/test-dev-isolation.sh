@@ -38,7 +38,7 @@ trap 'rm -rf "$TMP"' EXIT
 cat > "$TMP/main.swift" <<'SWIFT'
 import Foundation
 
-let expected: BuildProfile = CommandLine.arguments[1] == "dev" ? .scratch : .release
+let expected: BuildProfile = CommandLine.arguments[1] == "dev" ? .dev : .release
 func verify(_ condition: Bool, _ message: String) {
     guard condition else {
         FileHandle.standardError.write(Data("error: \(message)\n".utf8))
@@ -48,7 +48,7 @@ func verify(_ condition: Bool, _ message: String) {
 verify(BuildProfile.current == expected, "bundle profile is wrong")
 let defaults = Settings()
 verify(defaults.vaultPath == expected.defaultVaultPath, "default vault is wrong")
-if expected == .scratch {
+if expected == .dev {
     // A fixed folder beside the release one: not inside the checkout, so `make clean` cannot reach it.
     verify(defaults.vaultPath == "~/Documents/Plume-dev", "development vault is not ~/Documents/Plume-dev")
     verify(!defaults.vaultPath.contains("build"), "development vault is inside a build directory")

@@ -67,7 +67,7 @@ final class SettingsStore {
     // MARK: - Hand edits
 
     /// The last value this process put on disk, so a file-change event can tell our own write from
-    /// somebody opening the file in an editor. The same question `VaultSync` asks about notes, and
+    /// somebody opening the file in an editor. The same question `VaultReconciler` asks about notes, and
     /// the same answer: compare content, not timestamps.
     private var lastWrittenOnDisk: Settings?
 

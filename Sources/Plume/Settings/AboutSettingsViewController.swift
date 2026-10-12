@@ -14,7 +14,7 @@ import PlumeKit
 ///
 /// **Amended: "only when this button is pressed" is no longer true.** The same request is made on
 /// summon, about once a day, so that somebody on an old build finds out — see decision 136 and
-/// `UpdateChecker`. Nothing fires on *launch* and nothing is on a *timer*, which is the half of 94
+/// `ReleaseFetcher`. Nothing fires on *launch* and nothing is on a *timer*, which is the half of 94
 /// that survives: both callers are a press or a keypress, so the request only happens with a person
 /// at the keyboard. This button remains the way to ask on purpose, and it works with the setting
 /// switched off, because pressing it is asking.
@@ -26,7 +26,7 @@ import PlumeKit
 @MainActor
 final class AboutSettingsViewController: NSViewController {
 
-    private static let releasesPage = UpdateChecker.releasesPage
+    private static let releasesPage = ReleaseFetcher.releasesPage
     private static let repository = URL(string: "https://github.com/tiylabs/plume")!
     private static let licenseFile = URL(string: "https://github.com/tiylabs/plume/blob/master/LICENSE")!
 
@@ -38,7 +38,7 @@ final class AboutSettingsViewController: NSViewController {
     private var checkButton: NSButton!
 
     /// `CFBundleShortVersionString`, which `build-app.sh` writes from the tag.
-    private var version: String { UpdateChecker.runningVersion }
+    private var version: String { ReleaseFetcher.runningVersion }
 
     init() {
         super.init(nibName: nil, bundle: nil)
@@ -133,7 +133,7 @@ final class AboutSettingsViewController: NSViewController {
         status.stringValue = tr("about.checking")
         status.isHidden = false
 
-        UpdateChecker.fetchStatus { [weak self] result in
+        ReleaseFetcher.fetchStatus { [weak self] result in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     guard let self else { return }
