@@ -50,6 +50,7 @@ interface ActionPanelOptions {
   isAutoSizing: () => boolean;
   /** Which desktop the panel is assigned to, as Swift last said. */
   spaceAssignment: () => SpaceAssignmentState;
+  dockSpaceAssignment: () => DockSpaceAssignmentState;
   run: (id: string) => void;
   /** One of Assign to Desktop's choices was picked: `Settings.SpaceAssignment`'s raw value. */
   chooseSpace: (mode: string) => void;
@@ -68,6 +69,12 @@ export interface SpaceAssignmentState {
   canKeepToOne: boolean;
 }
 
+/** The system observation takes precedence over Plume's saved assignment. */
+export interface DockSpaceAssignmentState {
+  mode: "checking" | "unknown" | "unassigned" | "oneSpace" | "everySpace";
+  desktop: number | null;
+}
+
 /** The row that unfolds, and what unfolds under it — in the Dock's order. */
 const SPACE_ROW = "spaceBehaviour";
 const SPACE_CHOICES = ["unassigned", "oneSpace", "everySpace"];
@@ -78,6 +85,7 @@ const CHEVRON_SVG = `<path d="m6 9 6 6 6-6" />`;
 interface Entry {
   row: ActionRow;
   choice?: string;
+  disabled?: boolean;
 }
 
 /** Grouped exactly as frame 2a groups them; the hairlines between groups are the grouping. */
@@ -249,18 +257,27 @@ export function mountActionPanel(options: ActionPanelOptions) {
    *  Assign to Desktop's choices finds the row. */
   function matches(row: ActionRow, query: string): boolean {
     const needle = query.toLowerCase().trim();
-    const labels = row.id === SPACE_ROW ? [labelFor(row), ...choices().map(choiceLabel)] : [labelFor(row)];
+    const labels = row.id === SPACE_ROW
+      ? [labelFor(row), ...choices().map(choiceLabel)]
+      : [labelFor(row)];
     return labels.some((label) => label.toLowerCase().includes(needle));
   }
 
   /** This Desktop is only offered when Swift can tell desktops apart (decision 31: no dead rows). */
   function choices(): string[] {
     const state = options.spaceAssignment();
-    return SPACE_CHOICES.filter((choice) => choice !== "oneSpace" || state.canKeepToOne);
+    return SPACE_CHOICES.filter((choice) => isSystemAssigned() || choice !== "oneSpace" || state.canKeepToOne);
   }
 
   function choiceLabel(choice: string): string {
-    const desktop = options.spaceAssignment().desktop;
+    const dock = options.dockSpaceAssignment();
+    if (isSystemAssigned() && choice === dock.mode) {
+      if (choice === "oneSpace" && dock.desktop !== null) {
+        return t("editor.action.dockSpaceAssignment.oneSpaceNumbered", { number: String(dock.desktop) });
+      }
+      return t("editor.action.dockSpaceAssignment.system", { value: t(`editor.action.spaceAssignment.${choice}`) });
+    }
+    const desktop = isSystemAssigned() ? null : options.spaceAssignment().desktop;
     if (choice === "oneSpace" && desktop !== null) {
       return t("editor.action.spaceAssignment.oneSpaceNumbered", { number: String(desktop) });
     }
@@ -269,7 +286,7 @@ export function mountActionPanel(options: ActionPanelOptions) {
 
   function checkedChoiceIndex(): number {
     const mode = options.spaceAssignment().mode;
-    const index = visible.findIndex((entry) => entry.choice === mode);
+    const index = visible.findIndex((entry) => entry.choice === mode && !entry.disabled);
     return index >= 0 ? index : Math.max(0, visible.findIndex((entry) => entry.row.id === SPACE_ROW));
   }
 
@@ -291,6 +308,7 @@ export function mountActionPanel(options: ActionPanelOptions) {
     // One desktop is named by the desktop alone, not "This Desktop (Desktop 3)": the row has the
     // narrowest panel's width to fit in (`narrow.test.js`), and which desktop is the news.
     if (row.id === SPACE_ROW) {
+      if (isSystemAssigned()) return systemAssignmentLabel();
       const { mode, desktop } = options.spaceAssignment();
       const value =
         mode === "oneSpace" && desktop !== null
@@ -301,6 +319,30 @@ export function mountActionPanel(options: ActionPanelOptions) {
     // Every row's name is `editor.action.<id>` in the catalog — not a literal here, which is what
     // lets a language be added without touching this file.
     return t(`editor.action.${row.id}`);
+  }
+
+  function isSystemAssigned(): boolean {
+    const { mode } = options.dockSpaceAssignment();
+    return mode === "oneSpace" || mode === "everySpace";
+  }
+
+  function systemAssignmentLabel(): string {
+    const { mode, desktop } = options.dockSpaceAssignment();
+    const value = mode === "everySpace"
+      ? t("editor.action.spaceAssignment.everySpace")
+      : desktop === null
+        ? t("editor.action.dockSpaceAssignment.assignedDesktop")
+        : t("editor.action.spaceAssignment.desktop", { number: String(desktop) });
+    return t("editor.action.spaceBehaviour", { value });
+  }
+
+  function dockExplanation(): string {
+    const { mode } = options.dockSpaceAssignment();
+    if (mode === "checking" || mode === "unknown") {
+      return t(`editor.action.dockSpaceAssignment.${mode}`);
+    }
+    if (mode === "unassigned") return "";
+    return t("editor.action.dockSpaceAssignment.guidance");
   }
 
   function render(query: string): void {
@@ -322,10 +364,13 @@ export function mountActionPanel(options: ActionPanelOptions) {
           row.id === SPACE_ROW
             ? `<span class="actions__disclosure">${icon(CHEVRON_SVG, 12)}</span>`
             : "";
+        const systemAssigned = row.id === SPACE_ROW && isSystemAssigned();
+        const explanation = unfolded ? dockExplanation() : "";
         html += `
-          <div class="actions__row${row.danger ? " actions__row--danger" : ""}"
+          <div class="actions__row${row.danger ? " actions__row--danger" : ""}${systemAssigned ? " actions__row--system-assigned" : ""}"
                role="option" data-index="${index}" aria-selected="${index === selected}"
-               ${row.id === SPACE_ROW ? `aria-expanded="${unfolded}"` : ""}>
+               ${row.id === SPACE_ROW ? `aria-expanded="${unfolded}"` : ""}
+               ${explanation ? 'aria-describedby="dock-space-explanation"' : ""}>
             ${icon(row.svg).replace("<svg ", '<svg class="actions__icon" ')}
             <span class="actions__label">${escapeHtml(labelFor(row))}</span>
             ${disclosure}
@@ -335,7 +380,10 @@ export function mountActionPanel(options: ActionPanelOptions) {
                 .join("")}
             </span>
           </div>`;
-        if (unfolded) html += renderChoices(row);
+        if (unfolded) {
+          html += renderChoices(row);
+          if (explanation) html += `<div id="dock-space-explanation" class="actions__space-explanation">${escapeHtml(explanation)}</div>`;
+        }
       }
       html += `</div>`;
     }
@@ -350,14 +398,16 @@ export function mountActionPanel(options: ActionPanelOptions) {
 
   /** Assign to Desktop's choices, under it, the one in force ticked. */
   function renderChoices(row: ActionRow): string {
-    const mode = options.spaceAssignment().mode;
+    const disabled = isSystemAssigned();
+    const mode = disabled ? options.dockSpaceAssignment().mode : options.spaceAssignment().mode;
     let html = "";
     for (const choice of choices()) {
       const index = visible.length;
-      visible.push({ row, choice });
+      visible.push({ row, choice, disabled });
       html += `
-        <div class="actions__row actions__row--choice" role="option" data-index="${index}"
-             aria-selected="${index === selected}" aria-checked="${choice === mode}">
+        <div class="actions__row actions__row--choice${disabled && choice === mode ? " actions__row--system-assigned" : ""}" role="option" data-index="${index}"
+             aria-selected="${index === selected && !disabled}" aria-checked="${choice === mode}"
+             aria-disabled="${disabled}">
           ${icon(CHECK_SVG).replace("<svg ", '<svg class="actions__icon actions__check" ')}
           <span class="actions__label">${escapeHtml(choiceLabel(choice))}</span>
         </div>`;
@@ -381,7 +431,9 @@ export function mountActionPanel(options: ActionPanelOptions) {
   /** Stops at the ends rather than wrapping, for the reason spelled out on the switcher's `move`. */
   function move(delta: number): void {
     if (visible.length === 0) return;
-    select(Math.min(visible.length - 1, Math.max(0, selected + delta)), { scroll: true });
+    let index = selected + delta;
+    while (index >= 0 && index < visible.length && visible[index]?.disabled) index += delta;
+    if (index >= 0 && index < visible.length) select(index, { scroll: true });
   }
 
   /**
@@ -393,6 +445,7 @@ export function mountActionPanel(options: ActionPanelOptions) {
    * screen — which matters here more than in most lists, because every row does something.
    */
   function select(index: number, options: { scroll?: boolean } = {}): void {
+    if (visible[index]?.disabled) return;
     if (index === selected && !options.scroll) return;
     selected = index;
     list.querySelectorAll<HTMLElement>(".actions__row").forEach((row) => {
@@ -407,7 +460,7 @@ export function mountActionPanel(options: ActionPanelOptions) {
 
   function activate(): void {
     const entry = visible[selected];
-    if (!entry) return;
+    if (!entry || entry.disabled) return;
     // The row with choices under it opens or closes them; it has nothing of its own to run. Under a
     // search they are already showing, so ⏎ goes down to the one in force instead.
     if (entry.row.id === SPACE_ROW && entry.choice === undefined) {
@@ -513,9 +566,28 @@ export function mountActionPanel(options: ActionPanelOptions) {
     const row = (event.target as HTMLElement).closest<HTMLElement>(".actions__row");
     if (!row) return;
     event.preventDefault();
+    if (visible[Number(row.dataset.index)]?.disabled) return;
     selected = Number(row.dataset.index);
     activate();
   });
 
-  return { open: () => open(), close, toggle, isOpen, openSpaceAssignment };
+  /** An asynchronous Dock observation can arrive while ⌘K is open. Keep the user's query,
+   * selection and scroll position while updating the status and the room it needs. */
+  function refresh(): void {
+    if (!isOpen()) return;
+    const entry = visible[selected];
+    const scrollTop = list.scrollTop;
+    render(search.value);
+    if (entry) {
+      const index = visible.findIndex((candidate) => candidate.row.id === entry.row.id && candidate.choice === entry.choice);
+      if (index >= 0 && !visible[index]?.disabled) select(index);
+      else if (entry.row.id === SPACE_ROW) {
+        select(Math.max(0, visible.findIndex((candidate) => candidate.row.id === SPACE_ROW && candidate.choice === undefined)));
+      }
+    }
+    list.scrollTop = scrollTop;
+    options.onVisibilityChange(true, desiredHeight());
+  }
+
+  return { open: () => open(), close, toggle, isOpen, openSpaceAssignment, refresh };
 }

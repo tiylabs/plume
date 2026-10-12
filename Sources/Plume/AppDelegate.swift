@@ -216,6 +216,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        plume?.stopDockSpaceDetection()
         // Decision 10's third immediate flush. Everything else is recoverable; unsaved text is not.
         plume?.flush(trigger: .quitting)
         // And wait for it. Decision 10 lists quit as an immediate flush, but "immediate" only meant

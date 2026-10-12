@@ -291,6 +291,13 @@
   "editor.action.spaceAssignment.oneSpaceNumbered": "当前桌面（桌面 {number}）",
   "editor.action.spaceAssignment.everySpace": "全部桌面",
   "editor.action.spaceAssignment.desktop": "桌面 {number}",
+  "editor.action.dockSpaceAssignment.system": "{value}（由系统分配）",
+  "editor.action.dockSpaceAssignment.oneSpaceNumbered": "当前桌面（桌面 {number}，由系统分配）",
+  "editor.action.dockSpaceAssignment.assignedDesktop": "指定桌面",
+  "editor.action.dockSpaceAssignment.guidance": "无法在当前菜单中操作，请在Dock中右键Plume操作分配桌面",
+  "editor.action.dockSpaceAssignment.checking": "正在检查 macOS 桌面分配…",
+  "editor.action.dockSpaceAssignment.unknown": "暂时无法确认 macOS 桌面分配。若这些选项未生效，请检查 Dock → 选项 → 分配给。",
+
   "editor.action.hideFromCapture": "对屏幕录制隐藏",
   "editor.action.hideFromCapture.on": "在屏幕录制中显示",
   "editor.action.settings": "设置…",

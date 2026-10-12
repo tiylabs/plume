@@ -144,6 +144,16 @@ final class PlumeController: NSObject {
     private var lastContentHeight: CGFloat = PlumePanel.defaultHeight
     private let autoSizeBadge = AutoSizeBadge()
     private let spaceNotice = SpaceNotice()
+    private let dockSpaceAssignmentMonitor = DockSpaceAssignmentMonitor()
+    /// The last persisted Dock observation; separate from the user's Plume preference.
+    var detectedDockSpaceAssignment: DockSpaceAssignment { dockSpaceAssignmentMonitor.assignment }
+    private var appliedSpacePolicy: SpaceAssignmentPolicy?
+
+    private var effectiveSpacePolicy: SpaceAssignmentPolicy {
+        SpaceAssignmentPolicy.resolve(
+            settings: settings.value, dock: detectedDockSpaceAssignment, previous: appliedSpacePolicy
+        )
+    }
     /// A summon from another desktop of a panel kept to one it has not been filed on yet — parked at
     /// launch somewhere else. It comes up when you arrive; see `activeSpaceDidChange`.
     private var summonOnArrival = false
@@ -219,6 +229,11 @@ final class PlumeController: NSObject {
             name: NSWorkspace.activeSpaceDidChangeNotification,
             object: nil
         )
+        dockSpaceAssignmentMonitor.onChange = { [weak self] _ in
+            self?.applySpacePolicy()
+            self?.sendSpaceAssignment()
+        }
+        dockSpaceAssignmentMonitor.start()
     }
 
     // MARK: - Plume state
@@ -281,6 +296,7 @@ final class PlumeController: NSObject {
         guard Date().timeIntervalSince(lastToggle) > 0.25 else { return }
         lastToggle = Date()
 
+        applySpacePolicy()
         let elsewhere = assignedDesktopElsewhere()
         switch HotkeyPress.resolve(
             isUp: isVisible,
@@ -313,6 +329,8 @@ final class PlumeController: NSObject {
     }
 
     func summon() {
+        dockSpaceAssignmentMonitor.refresh()
+        applySpacePolicy()
         // Kept to one desktop and summoned from another: it stays where it is, and says so. Every
         // route in comes through here — the menu bar, the Dock icon, a note opened from a menu.
         if let desktop = assignedDesktopElsewhere() {
@@ -390,6 +408,10 @@ final class PlumeController: NSObject {
         startTrackingResizeEdge()
     }
 
+    func stopDockSpaceDetection() {
+        dockSpaceAssignmentMonitor.stop()
+    }
+
     func dismiss() {
         flush(trigger: .dismissed)
         // Decision 103's freeze list, first entry. The write above still lands; only the *name*
@@ -406,7 +428,21 @@ final class PlumeController: NSObject {
         if NSApp.isActive { NSApp.deactivate() }
     }
 
-    // MARK: - Kept to one desktop
+    // MARK: - Desktop assignment
+
+    /// One policy drives both collectionBehavior and the hotkey's desktop restriction. Reordering
+    /// a system-managed window after a policy change lets Dock apply its binding to this existing
+    /// panel, whose offscreen parking otherwise keeps it permanently in the window list.
+    private func applySpacePolicy() {
+        let policy = effectiveSpacePolicy
+        let previous = appliedSpacePolicy
+        appliedSpacePolicy = policy
+        panel.showsOnEverySpace = policy.showsOnEverySpace
+        if policy != previous { summonOnArrival = false }
+        if policy.isSystemManaged, policy != previous {
+            panel.reapplySystemSpaceAssignment()
+        }
+    }
 
     /// The desktop `oneSpace` keeps to, when that is the setting and the desktop still exists.
     ///
@@ -414,10 +450,10 @@ final class PlumeController: NSObject {
     /// says so too. A lookup that merely failed does not: `Spaces.isGone` only answers yes when it
     /// could see every desktop and this was not among them.
     private func assignedDesktop() -> Spaces.Desktop? {
-        guard settings.value.spaceAssignment == .oneSpace, let uuid = settings.value.assignedSpace
-        else { return nil }
+        let policy = effectiveSpacePolicy
+        guard policy.mode == .oneSpace, let uuid = policy.desktopUUID else { return nil }
         if let desktop = Spaces.desktop(uuid: uuid) { return desktop }
-        if Spaces.isGone(uuid) {
+        if !policy.isSystemManaged, Spaces.isGone(uuid) {
             settings.update {
                 $0.spaceAssignment = .unassigned
                 $0.assignedSpace = nil
@@ -460,6 +496,7 @@ final class PlumeController: NSObject {
     /// it up if a summon from elsewhere was waiting for it. Every arrival also tells the ⌘K row which
     /// desktop "This Desktop" would mean now.
     @objc private func activeSpaceDidChange() {
+        applySpacePolicy()
         defer { sendSpaceAssignment() }
         guard let desktop = assignedDesktop(), Spaces.active() == desktop else { return }
         panel.parkOnActiveSpace()
@@ -473,11 +510,35 @@ final class PlumeController: NSObject {
     /// to, or the one it would keep to if chosen now. Without SkyLight that row is not offered.
     private func sendSpaceAssignment() {
         let assignment = settings.value.spaceAssignment
-        let desktop = assignment == .oneSpace ? assignedDesktop() : Spaces.active()
+        let desktop = assignment == .oneSpace
+            ? settings.value.assignedSpace.flatMap { Spaces.desktop(uuid: $0) }
+            : Spaces.active()
         editor.call("setSpaceAssignment", [
             assignment.rawValue,
             desktop.map { $0.number as Any } ?? NSNull(),
             Spaces.isAvailable,
+        ])
+        sendDockSpaceAssignment()
+    }
+
+    /// System assignments own the menu's displayed result and disable Plume's choices.
+    private func sendDockSpaceAssignment() {
+        let mode: String
+        var desktop: Spaces.Desktop?
+        switch detectedDockSpaceAssignment {
+        case .unassigned:
+            mode = "unassigned"
+        case .everySpace:
+            mode = "everySpace"
+        case .oneSpace(let uuid):
+            mode = "oneSpace"
+            desktop = Spaces.desktop(uuid: uuid)
+        case .unknown(let reason):
+            mode = reason == .notReadYet ? "checking" : "unknown"
+        }
+        editor.call("setDockSpaceAssignment", [
+            mode,
+            desktop.map { $0.number as Any } ?? NSNull(),
         ])
     }
 
@@ -1473,8 +1534,7 @@ final class PlumeController: NSObject {
         // A borderless transparent window's shadow is cast by its rectangular backing, so over glass
         // it showed as a square black frame around the rounded panel. Glass has its own edge.
         panel.hasShadow = !editor.usesGlass
-        panel.showsOnEverySpace = settings.value.spaceAssignment == .everySpace
-        if settings.value.spaceAssignment != .oneSpace { summonOnArrival = false }
+        applySpacePolicy()
         panel.keepsOnTop = settings.value.keepOnTop
         editor.holdsFocusedLook = settings.value.keepOnTop
         editor.call("setKeepOnTop", [settings.value.keepOnTop])
@@ -1659,6 +1719,7 @@ extension PlumeController: EditorWebViewDelegate {
             applyContentHeight(heightWanted)
 
         case .actionsOpen(let open, let height):
+            if open { dockSpaceAssignmentMonitor.refresh() }
             actionsIsOpen = open
             // Its height is measured rather than assumed, because filtering changes it. What the
             // panel grows to is not that plus two literals — see `plumeHeight(forOverlay:)`, which
@@ -1701,6 +1762,10 @@ extension PlumeController: EditorWebViewDelegate {
             toggleAutoSizing()
 
         case .setSpaceAssignment(let mode):
+            guard !effectiveSpacePolicy.isSystemManaged else {
+                sendSpaceAssignment()
+                return
+            }
             guard let assignment = Settings.SpaceAssignment(rawValue: mode) else { return }
             // "This Desktop" is the one the panel is on, which is the one being looked at: ⌘K is open
             // in it. A panel on every Space has no one desktop, so it is the active one there.
@@ -1713,7 +1778,7 @@ extension PlumeController: EditorWebViewDelegate {
                 $0.assignedSpace = desktop?.uuid
             }
             // `settings.update` reaches `applySettings` asynchronously; the choice should act at once.
-            panel.showsOnEverySpace = assignment == .everySpace
+            applySpacePolicy()
             sendSpaceAssignment()
             // Decision 73's rule: what this changes is invisible until you switch Space, so without a
             // line the row reads as having done nothing at all.

@@ -187,12 +187,39 @@
   flex: none;
 }
 
+.actions__space-explanation {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.actions__space-explanation {
+  padding: 6px 10px 8px 34px;
+}
+
 .actions__label {
   flex: 1;
   font-size: var(--overlay-row-size);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Keep the system source on the checked choice readable at minimum width. */
+.actions__row--system-assigned .actions__label {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.actions__row--choice[aria-disabled="true"] {
+  color: var(--text-tertiary);
+}
+
+.actions__row--choice[aria-disabled="true"][aria-selected="true"] {
+  background: transparent;
 }
 
 /* ---- Assign to Desktop's choices ----------------------------------------------------------------

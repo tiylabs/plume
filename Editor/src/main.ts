@@ -41,7 +41,7 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 
-import { mountActionPanel, type SpaceAssignmentState } from "./action-panel";
+import { mountActionPanel, type SpaceAssignmentState, type DockSpaceAssignmentState } from "./action-panel";
 import { placeOverlay } from "./overlay";
 import { describe, hideTooltip, mountTooltips, setPointer } from "./tooltip";
 import { findHighlighting, mountFind } from "./find";
@@ -883,6 +883,7 @@ let hiddenFromCapture = false;
 let autoSizing = true;
 /** Which desktop the panel is assigned to. Swift's to decide — the page cannot see Spaces. */
 let spaceAssignment: SpaceAssignmentState = { mode: "unassigned", desktop: null, canKeepToOne: false };
+let dockSpaceAssignment: DockSpaceAssignmentState = { mode: "checking", desktop: null };
 
 const actionsEl = document.getElementById("actions") as HTMLElement;
 const switcherEl = document.getElementById("switcher") as HTMLElement;
@@ -905,6 +906,7 @@ const actions = mountActionPanel({
   isHiddenFromCapture: () => hiddenFromCapture,
   isAutoSizing: () => autoSizing,
   spaceAssignment: () => spaceAssignment,
+  dockSpaceAssignment: () => dockSpaceAssignment,
   run: (id) => actionHandlers[id]?.(),
   chooseSpace: (mode) => send({ type: "setSpaceAssignment", mode }),
   // The keys a row prints come from the bindings in force, not from a literal beside the label.
@@ -1203,6 +1205,13 @@ const host = {
 
   setSpaceAssignment(mode: string, desktop: number | null, canKeepToOne: boolean): void {
     spaceAssignment = { mode, desktop, canKeepToOne };
+    actions.refresh();
+  },
+
+  setDockSpaceAssignment(mode: DockSpaceAssignmentState["mode"], desktop: number | null): void {
+    if (dockSpaceAssignment.mode === mode && dockSpaceAssignment.desktop === desktop) return;
+    dockSpaceAssignment = { mode, desktop };
+    actions.refresh();
   },
 
   setAutoSizing(on: boolean): void {

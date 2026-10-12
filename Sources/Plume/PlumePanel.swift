@@ -183,8 +183,8 @@ final class PlumePanel: NSPanel {
     ///
     /// `.fullScreenAuxiliary` joins a fullscreen app as an overlay rather than forcing a Space
     /// switch out of it.
-    /// `Settings.spaceAssignment == .everySpace`, kept here because `summon` re-asserts the
-    /// behaviour on every summon and has no route to the settings store.
+    /// The effective assignment's every-Space flag: an explicit Dock binding takes precedence
+    /// over Plume's saved preference. The controller resolves that policy.
     ///
     /// Off drops `.canJoinAllSpaces`, so the panel belongs to the Space it is on rather than being
     /// drawn on all of them. `.ignoresCycle` and `.fullScreenAuxiliary` stay either way — the panel
@@ -257,6 +257,16 @@ final class PlumePanel: NSPanel {
         var behaviour: NSWindow.CollectionBehavior = [.fullScreenAuxiliary, .ignoresCycle]
         if showsOnEverySpace { behaviour.insert(.canJoinAllSpaces) }
         collectionBehavior = behaviour
+    }
+
+    /// Re-enter the window list with the resolved collectionBehavior so macOS can apply Dock's
+    /// app binding. Keep the same frame, parked state, document and focus; never activate the app
+    /// or request that Mission Control switch desktops.
+    func reapplySystemSpaceAssignment() {
+        let hadFocus = isKeyWindow
+        orderOut(nil)
+        orderFrontRegardless()
+        if hadFocus && isSummoned && isOnActiveSpace { makeKey() }
     }
 
     // MARK: - Summon and dismiss
