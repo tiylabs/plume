@@ -65,6 +65,14 @@ jobs:
       - name: Test everything
         run: Scripts/test-all.sh
 
+      # Errors fail the build (the length ratchet in .swiftlint.yml); the handful of warnings the
+      # code already had do not.
+      - name: Lint Swift
+        run: |
+          brew install swiftlint
+          swiftlint version
+          swiftlint lint --quiet
+
       # Assembles the real .app, so a break in the bundling script, the Info.plist substitution or
       # the ad-hoc signature fails the build rather than waiting for a release.
       - name: Build Plume.app

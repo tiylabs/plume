@@ -2,6 +2,7 @@
 # names, big view controllers). Add rules back as the code is brought in line.
 included:
   - Sources
+  - Tests   # the suite moves here in phase 1; a missing path is ignored
 excluded:
   - .build
   - build
@@ -11,11 +12,25 @@ disabled_rules:
   - trailing_comma        # multi-line literals keep their trailing comma
   - identifier_name       # x / y / dx / i are the right names in geometry code
   - line_length           # comments carry the decision record and run long
-  - file_length
-  - type_body_length
-  - function_body_length
   - cyclomatic_complexity
   - large_tuple
   - type_name
 
 opt_in_rules: []
+
+# Length rules are a ratchet, not a style opinion: the error thresholds sit just above the largest
+# current non-test offender (measured with swiftlint 0.65.1, 2026-10-13) so nothing new can grow past
+# today's worst, and the warning thresholds are the target. Each phase of
+# docs/architecture-refactor-plan.md lowers the errors; warnings do not fail the build.
+#   file_length            largest: PlumeController.swift 2092  -> error 1000 after phase 4
+#   type_body_length       largest: PlumeController 950         -> error 700 after phase 4
+#   function_body_length   largest: editor(_:didReceive:) 131   -> error 100 after phase 4
+file_length:
+  warning: 600
+  error: 2200
+type_body_length:
+  warning: 400
+  error: 1000
+function_body_length:
+  warning: 80
+  error: 140
