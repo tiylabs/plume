@@ -56,7 +56,7 @@ public struct Settings: Codable, Equatable, Sendable {
 
     public var dismissMode: DismissMode
 
-    // MARK: In-plume shortcuts
+    // MARK: In-panel shortcuts
 
     /// The shortcuts that work inside a panel, keyed by action — design frame 3c's table.
     ///
@@ -110,10 +110,10 @@ public struct Settings: Codable, Equatable, Sendable {
             ("deleteNote", "Ctrl-x", "note"),
             ("pinPlume", "Shift-Mod-p", "note"),
 
-            ("autoSizing", "Shift-Mod-/", "plume"),
-            ("formatBar", "Alt-Mod-,", "plume"),
-            ("spaceBehaviour", "Alt-Mod-s", "plume"),
-            ("hideFromCapture", "Shift-Mod-h", "plume"),
+            ("autoSizing", "Shift-Mod-/", "panel"),
+            ("formatBar", "Alt-Mod-,", "panel"),
+            ("spaceBehaviour", "Alt-Mod-s", "panel"),
+            ("hideFromCapture", "Shift-Mod-h", "panel"),
         ]
 
     /// The name a Shortcuts row shows for `key`, in the language in effect.

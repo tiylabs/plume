@@ -7,7 +7,7 @@ func runHotkeyPressTests() {
     Check.suite("Hotkey press") {
         let modes: [Settings.DismissMode] = [.sameHotkeyToggles, .escapeOnly]
 
-        Check.test("a parked plume is summoned, whatever else is true") {
+        Check.test("a parked panel is summoned, whatever else is true") {
             for mode in modes {
                 for space in [true, false] {
                     for focus in [true, false] {

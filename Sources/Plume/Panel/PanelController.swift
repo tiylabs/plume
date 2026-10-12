@@ -9,7 +9,7 @@ import PlumeKit
 /// for this type to hold no static state and know nothing about how many of it exist. Everything it
 /// needs — the vault, the shared state file — is handed in.
 @MainActor
-final class PlumeController: NSObject {
+final class PanelController: NSObject {
 
     /// What the panel is telling the user about itself, in one line above the editor.
     ///
@@ -54,7 +54,7 @@ final class PlumeController: NSObject {
         }
     }
 
-    let panel = PlumePanel()
+    let panel = PanelWindow()
     let editor = EditorWebView(frame: .zero)
 
     private let vault: VaultService
@@ -72,7 +72,7 @@ final class PlumeController: NSObject {
     /// launch (decision 136): a summon is a keypress, so there is somebody at the keyboard.
     var onSummoned: (() -> Void)?
 
-    private var plumeID: UUID
+    private var panelID: UUID
 
     // MARK: Buffer
 
@@ -141,7 +141,7 @@ final class PlumeController: NSObject {
 
     // MARK: Layout
 
-    private var lastContentHeight: CGFloat = PlumePanel.defaultHeight
+    private var lastContentHeight: CGFloat = PanelWindow.defaultHeight
     private let autoSizeBadge = AutoSizeBadge()
     private let spaceNotice = SpaceNotice()
     private let dockSpaceAssignmentMonitor = DockSpaceAssignmentMonitor()
@@ -162,17 +162,17 @@ final class PlumeController: NSObject {
     private var isCloseHovered = false
     private var switcherIsOpen = false
     private var actionsIsOpen = false
-    private var actionsPlumeHeight: CGFloat = 0
+    private var actionsPanelHeight: CGFloat = 0
 
-    /// Plume height while the switcher is open, measured by the panel rather than assumed here.
+    /// Panel height while the switcher is open, measured by the panel rather than assumed here.
     ///
-    /// This was a constant — `plumeHeight(forOverlay: 54 + 430 + 34)` — and it was wrong twice over.
-    /// It fed in the 54px top offset that `plumeHeight(forOverlay:)` adds for itself, and it assumed
+    /// This was a constant — `panelHeight(forOverlay: 54 + 430 + 34)` — and it was wrong twice over.
+    /// It fed in the 54px top offset that `panelHeight(forOverlay:)` adds for itself, and it assumed
     /// a full 430px list whatever the vault held: ⌘P grew the panel to 691pt on a six-note vault and
     /// left a 370pt panel floating in the middle of it. ⌘K has reported its own height since
     /// decision 45; this is the switcher finally doing the same, which is also the last thing the
     /// two overlays did differently.
-    private var switcherPlumeHeight: CGFloat = 0
+    private var switcherPanelHeight: CGFloat = 0
 
     init(vault: VaultService, state: StateStore, settings: SettingsStore) {
         self.vault = vault
@@ -180,8 +180,8 @@ final class PlumeController: NSObject {
         self.settings = settings
 
         // Reuse the panel the last session left behind, so its remembered frames come back with it.
-        if let existing = state.value.plumes.first {
-            plumeID = existing.id
+        if let existing = state.value.panels.first {
+            panelID = existing.id
         } else {
             // **A panel that has never existed starts square, with auto-sizing off** — decision 129.
             //
@@ -199,12 +199,12 @@ final class PlumeController: NSObject {
             // `manualHeight` has to be set alongside the flag: `heightWanted` falls back to the
             // content height when it is nil, so `autoSizing = false` on its own is auto-sizing with
             // extra steps.
-            let fresh = PlumeState(
+            let fresh = PanelState(
                 autoSizing: false,
-                manualHeight: Double(PlumePanel.defaultHeight)
+                manualHeight: Double(PanelWindow.defaultHeight)
             )
-            plumeID = fresh.id
-            state.update { $0.plumes = [fresh] }
+            panelID = fresh.id
+            state.update { $0.panels = [fresh] }
         }
 
         super.init()
@@ -220,7 +220,7 @@ final class PlumeController: NSObject {
         // summon, and the first summon must not be the first time anything renders.
         //
         // Through the panel rather than by setting the origin here, because "offscreen" is a state
-        // the panel defends and not just a coordinate — see `PlumePanel.parkBeforeFirstSummon`.
+        // the panel defends and not just a coordinate — see `PanelWindow.parkBeforeFirstSummon`.
         panel.parkBeforeFirstSummon()
 
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -238,14 +238,14 @@ final class PlumeController: NSObject {
 
     // MARK: - Plume state
 
-    private var plumeState: PlumeState {
-        get { state.value.plumes.first { $0.id == plumeID } ?? PlumeState(id: plumeID) }
+    private var panelState: PanelState {
+        get { state.value.panels.first { $0.id == panelID } ?? PanelState(id: panelID) }
         set {
             state.update { s in
-                if let i = s.plumes.firstIndex(where: { $0.id == plumeID }) {
-                    s.plumes[i] = newValue
+                if let i = s.panels.firstIndex(where: { $0.id == panelID }) {
+                    s.panels[i] = newValue
                 } else {
-                    s.plumes.append(newValue)
+                    s.panels.append(newValue)
                 }
             }
         }
@@ -352,11 +352,11 @@ final class PlumeController: NSObject {
         guard let screen else { return }
 
         let frame = PanelGeometry.restore(
-            remembered: plumeState.frames[Self.displayKey(screen)]?.rect,
-            lastSize: plumeState.lastSize?.size,
-            titleBarHeight: PlumePanel.titleBarHeight,
+            remembered: panelState.frames[Self.displayKey(screen)]?.rect,
+            lastSize: panelState.lastSize?.size,
+            titleBarHeight: PanelWindow.titleBarHeight,
             activeVisibleFrame: screen.visibleFrame,
-            defaultWidth: PlumePanel.defaultWidth,
+            defaultWidth: PanelWindow.defaultWidth,
             defaultHeight: max(PanelGeometry.minimumHeight, lastContentHeight)
         )
 
@@ -364,7 +364,7 @@ final class PlumeController: NSObject {
         // Decision 41: the chrome follows the cursor, and summoning moves the panel rather than the
         // cursor — so a panel that opens under a stationary pointer gets no `mouseenter` and would
         // sit dimmed until the mouse moved. Only Swift knows the new frame and the pointer at once.
-        isHovered = isPointerOnPlume(NSEvent.mouseLocation)
+        isHovered = isPointerOnPanel(NSEvent.mouseLocation)
         editor.call("setHover", [isHovered])
         refreshCloseHover()
         // The height the note wanted may have moved while the panel was away — an external edit, or a
@@ -550,10 +550,10 @@ final class PlumeController: NSObject {
         // held the same rect, the portrait panel's, including the main display's. Writing nothing is
         // strictly better — the frame that is already stored is still true (decision 131).
         guard let screen = panel.screen, let frame = panel.rememberedFrame else { return }
-        var plume = plumeState
-        plume.frames[Self.displayKey(screen)] = StoredFrame(frame)
-        plume.lastSize = StoredSize(frame.size)
-        plumeState = plume
+        var next = panelState
+        next.frames[Self.displayKey(screen)] = StoredFrame(frame)
+        next.lastSize = StoredSize(frame.size)
+        panelState = next
     }
 
     /// The per-display key, off the display's **persistent UUID**.
@@ -689,9 +689,9 @@ final class PlumeController: NSObject {
         pendingCreatedName = nil
 
         state.update { $0.recordOpen(filename, at: Date()) }
-        var plume = plumeState
-        plume.noteFilename = filename
-        plumeState = plume
+        var next = panelState
+        next.noteFilename = filename
+        panelState = next
 
         let noteState = state.value.note(filename)
         editor.call("loadNote", [filename, text, noteState.caretOffset, noteState.isPinned])
@@ -725,9 +725,9 @@ final class PlumeController: NSObject {
         baselineHash = nil
         isDraft = true
 
-        var plume = plumeState
-        plume.noteFilename = nil
-        plumeState = plume
+        var next = panelState
+        next.noteFilename = nil
+        panelState = next
 
         // Empty filename rather than a made-up one: the web layer reads it as "no note", so ⌃X and
         // the pin decline rather than acting on a file that does not exist.
@@ -805,9 +805,9 @@ final class PlumeController: NSObject {
             // to rename the file.
             $0.recordCaret(filename, offset: lastReportedCaret)
         }
-        var plume = plumeState
-        plume.noteFilename = filename
-        plumeState = plume
+        var next = panelState
+        next.noteFilename = filename
+        panelState = next
 
         editor.call("setNoteFilename", [filename])
         onPinsChanged?()
@@ -961,9 +961,9 @@ final class PlumeController: NSObject {
                         moved.lastOpened = Date()
                         s.notes[sibling] = moved
                     }
-                    var plume = self.plumeState
-                    plume.noteFilename = sibling
-                    self.plumeState = plume
+                    var next = self.panelState
+                    next.noteFilename = sibling
+                    self.panelState = next
 
                     // And tell the web layer, which otherwise goes on holding the *original*
                     // filename — `loadNote` is the only thing that sets it and this path
@@ -1059,9 +1059,9 @@ final class PlumeController: NSObject {
             if let moved = s.notes.removeValue(forKey: old) { s.notes[new] = moved }
         }
 
-        var plume = plumeState
-        plume.noteFilename = new
-        plumeState = plume
+        var next = panelState
+        next.noteFilename = new
+        panelState = next
 
         // Back and Forward hold filenames, so an un-rewritten entry is a ⌘[ onto a file that no
         // longer exists — which `open` would then treat as a missing note and drop from state.
@@ -1106,7 +1106,7 @@ final class PlumeController: NSObject {
         alert.accessoryView = field
         alert.window.initialFirstResponder = field
 
-        guard PlumePanel.steppingAside({ alert.runModal() }) == .alertFirstButtonReturn else { return }
+        guard PanelWindow.steppingAside({ alert.runModal() }) == .alertFirstButtonReturn else { return }
 
         let typed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         // An empty field is a slip, not a request for a note called `untitled` — and unlike the
@@ -1491,15 +1491,15 @@ final class PlumeController: NSObject {
     /// size anyone asked for. Closing the overlay returns to whichever answer the mode gives.
     private var heightWanted: CGFloat {
         // The held height is the *current display's*, not the panel's — see
-        // `PlumeState.heldHeight(onDisplay:)`. Safe to read `panel.screen` here: every caller runs
+        // `PanelState.heldHeight(onDisplay:)`. Safe to read `panel.screen` here: every caller runs
         // with the panel on screen, and `applyContentHeight` declines outright when it is not.
         let held: Double? = (panel.screen ?? NSScreen.main)
-            .flatMap { plumeState.heldHeight(onDisplay: Self.displayKey($0)) }
-        var wanted = plumeState.autoSizing
+            .flatMap { panelState.heldHeight(onDisplay: Self.displayKey($0)) }
+        var wanted = panelState.autoSizing
             ? lastContentHeight
             : CGFloat(held ?? Double(lastContentHeight))
-        if switcherIsOpen { wanted = max(wanted, switcherPlumeHeight) }
-        if actionsIsOpen { wanted = max(wanted, actionsPlumeHeight) }
+        if switcherIsOpen { wanted = max(wanted, switcherPanelHeight) }
+        if actionsIsOpen { wanted = max(wanted, actionsPanelHeight) }
         return wanted
     }
 
@@ -1541,7 +1541,7 @@ final class PlumeController: NSObject {
         applyHiddenFromCapture()
         // Not a setting — panel state — but this runs on `ready`, which is the one moment the web
         // layer needs telling. Its ⌘K label is otherwise wrong until the row is pressed once.
-        editor.call("setAutoSizing", [plumeState.autoSizing])
+        editor.call("setAutoSizing", [panelState.autoSizing])
         sendSpaceAssignment()
 
         // The material picks its light or dark variant from the window's appearance, so the two have
@@ -1625,12 +1625,12 @@ final class PlumeController: NSObject {
         // The one place other than "choose vault" (decision 27) where Plume activates on purpose:
         // a save panel behind every other window is a hang as far as the user is concerned. And
         // activating is not enough on its own — the panel is `.floating`, so the panel came up behind
-        // it with the Save button under its edge until `stepAside` (see `PlumePanel`).
-        PlumePanel.stepAside()
+        // it with the Save button under its edge until `stepAside` (see `PanelWindow`).
+        PanelWindow.stepAside()
         NSApp.activate(ignoringOtherApps: true)
 
         panel.begin { [weak self] response in
-            PlumePanel.resumeFloating()
+            PanelWindow.resumeFloating()
             guard response == .OK, let url = panel.url, let self else { return }
             let html = MarkdownExport.html(
                 from: text,
@@ -1656,9 +1656,9 @@ final class PlumeController: NSObject {
 
 // MARK: - Web layer
 
-extension PlumeController: EditorWebViewDelegate {
+extension PanelController: EditorWebViewDelegate {
 
-    func editor(_ editor: EditorWebView, didReceive message: PlumeMessage) {
+    func editor(_ editor: EditorWebView, didReceive message: BridgeMessage) {
         switch message {
         case .ready:
             editor.markReady()
@@ -1712,9 +1712,9 @@ extension PlumeController: EditorWebViewDelegate {
             // yet; the first render sends the real one. Holding the previous value until then keeps
             // a re-opened switcher from collapsing the panel for a frame.
             if !open {
-                switcherPlumeHeight = 0
+                switcherPanelHeight = 0
             } else if height > 0 {
-                switcherPlumeHeight = PanelGeometry.plumeHeight(forOverlay: height)
+                switcherPanelHeight = PanelGeometry.panelHeight(forOverlay: height)
             }
             applyContentHeight(heightWanted)
 
@@ -1722,9 +1722,9 @@ extension PlumeController: EditorWebViewDelegate {
             if open { dockSpaceAssignmentMonitor.refresh() }
             actionsIsOpen = open
             // Its height is measured rather than assumed, because filtering changes it. What the
-            // panel grows to is not that plus two literals — see `plumeHeight(forOverlay:)`, which
+            // panel grows to is not that plus two literals — see `panelHeight(forOverlay:)`, which
             // grows to a height the placement rule in overlay.ts is happy with.
-            actionsPlumeHeight = open ? PanelGeometry.plumeHeight(forOverlay: height) : 0
+            actionsPanelHeight = open ? PanelGeometry.panelHeight(forOverlay: height) : 0
             applyContentHeight(heightWanted)
 
         case .renameFile:
@@ -1905,7 +1905,7 @@ extension PlumeController: EditorWebViewDelegate {
 
 // MARK: - Window
 
-extension PlumeController: NSWindowDelegate {
+extension PanelController: NSWindowDelegate {
 
     /// A drag is what turns auto-sizing off — decision 40, and Raycast Notes' behaviour exactly.
     ///
@@ -1929,10 +1929,10 @@ extension PlumeController: NSWindowDelegate {
         defer { refreshAutoSizeBadge() }
         guard !switcherIsOpen, !actionsIsOpen else { return }
 
-        var plume = plumeState
-        plume.autoSizing = false
-        plume.manualHeight = Double(panel.frame.height)
-        plumeState = plume
+        var next = panelState
+        next.autoSizing = false
+        next.manualHeight = Double(panel.frame.height)
+        panelState = next
         rememberFrame()
 
         // The mode changed without anyone pressing the row, so the row's label is now a lie until
@@ -1946,17 +1946,17 @@ extension PlumeController: NSWindowDelegate {
     /// Turning it back on drops the dragged height, so the panel immediately fits its note again;
     /// that snap is the feedback that the mode changed.
     func toggleAutoSizing() {
-        var plume = plumeState
-        plume.autoSizing.toggle()
-        plume.manualHeight = plume.autoSizing ? nil : Double(panel.frame.height)
-        plumeState = plume
+        var next = panelState
+        next.autoSizing.toggle()
+        next.manualHeight = next.autoSizing ? nil : Double(panel.frame.height)
+        panelState = next
 
-        editor.call("setAutoSizing", [plume.autoSizing])
+        editor.call("setAutoSizing", [next.autoSizing])
         applyContentHeight(heightWanted)
         rememberFrame()
     }
 
-    var isAutoSizing: Bool { plumeState.autoSizing }
+    var isAutoSizing: Bool { panelState.autoSizing }
 
     // MARK: - The auto-size pill
 
@@ -1997,7 +1997,7 @@ extension PlumeController: NSWindowDelegate {
     /// pointer for the pill and do not care which app is active, so hover comes from the same place.
     private func refreshHover() {
         guard panel.isSummoned else { return }
-        let inside = isPointerOnPlume(NSEvent.mouseLocation)
+        let inside = isPointerOnPanel(NSEvent.mouseLocation)
         if inside != isHovered {
             isHovered = inside
             editor.call("setHover", [inside])
@@ -2054,13 +2054,13 @@ extension PlumeController: NSWindowDelegate {
         let near = !switcherIsOpen && !actionsIsOpen
             && AutoSizeBadge.isNearResizeEdge(pointer, of: frame)
             && isExposed(PanelGeometry.bottomEdgeProbe(nearest: pointer, of: frame))
-        autoSizeBadge.update(near: frame, autoSizing: plumeState.autoSizing, visible: near)
+        autoSizeBadge.update(near: frame, autoSizing: panelState.autoSizing, visible: near)
     }
 
     /// Decision 181: the pointer is on the panel only where the panel can be seen. Another app's
     /// floating window, Plume's own Settings, or the panel being on another Space all leave the
     /// rectangle where it was and the panel out of reach.
-    private func isPointerOnPlume(_ point: CGPoint) -> Bool {
+    private func isPointerOnPanel(_ point: CGPoint) -> Bool {
         panel.isSummoned && panel.frame.contains(point) && isExposed(point)
     }
 

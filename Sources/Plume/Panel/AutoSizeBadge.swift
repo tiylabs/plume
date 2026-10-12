@@ -84,12 +84,12 @@ final class AutoSizeBadge {
         panel.contentView = background
     }
 
-    /// Shows the pill under `plumeFrame`, or hides it.
+    /// Shows the pill under `panelFrame`, or hides it.
     ///
     /// - Parameter autoSizing: what the pill should say. Both states are worth showing: near the
     ///   edge with auto-sizing on it warns that dragging will end it, and with auto-sizing off it
     ///   explains why the panel stopped following the note.
-    func update(near plumeFrame: CGRect, autoSizing: Bool, visible: Bool) {
+    func update(near panelFrame: CGRect, autoSizing: Bool, visible: Bool) {
         guard visible else {
             hide()
             return
@@ -98,8 +98,8 @@ final class AutoSizeBadge {
         label.stringValue = autoSizing ? tr("badge.autoSize") : tr("badge.autoSizeOff")
         let size = CGSize(width: label.intrinsicContentSize.width + 28, height: 26)
         let origin = CGPoint(
-            x: (plumeFrame.midX - size.width / 2).rounded(),
-            y: (plumeFrame.minY - size.height - Self.offset).rounded()
+            x: (panelFrame.midX - size.width / 2).rounded(),
+            y: (panelFrame.minY - size.height - Self.offset).rounded()
         )
         panel.setFrame(CGRect(origin: origin, size: size), display: true)
 

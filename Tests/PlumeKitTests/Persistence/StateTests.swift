@@ -21,7 +21,7 @@ private func parseError(_ input: String) -> Hotkey.ParseError? {
 
 private func temporaryDirectory() -> URL {
     let dir = FileManager.default.temporaryDirectory
-        .appendingPathComponent("plume-tests-\(UUID().uuidString)")
+        .appendingPathComponent("panel-tests-\(UUID().uuidString)")
     try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     return dir
 }
@@ -207,16 +207,16 @@ func runStateTests() {
             Check.equal(activity(at("2026-08-01T00:00:00Z")), opened)
         }
 
-        Check.test("forgetting deleted notes also clears plumes pointing at them") {
+        Check.test("forgetting deleted notes also clears panels pointing at them") {
             var s = AppState()
             s.togglePin("gone.md")
             s.togglePin("kept.md")
-            s.plumes = [PlumeState(noteFilename: "gone.md"), PlumeState(noteFilename: "kept.md")]
+            s.panels = [PanelState(noteFilename: "gone.md"), PanelState(noteFilename: "kept.md")]
 
             s.forgetNotes(missingFrom: ["kept.md"])
             Check.equal(s.pinnedFilenames, ["kept.md"])
-            Check.expect(s.plumes[0].noteFilename == nil, "orphaned plume must let go of the note")
-            Check.equal(s.plumes[1].noteFilename, "kept.md")
+            Check.expect(s.panels[0].noteFilename == nil, "orphaned panel must let go of the note")
+            Check.equal(s.panels[1].noteFilename, "kept.md")
         }
     }
 
@@ -235,7 +235,7 @@ func runStateTests() {
             state.recordCaret("a.md", offset: 99)
             state.recordOpen("a.md", at: at("2026-08-14T12:00:00Z"))
             state.togglePin("a.md")
-            state.plumes = [PlumeState(noteFilename: "a.md", frames: [
+            state.panels = [PanelState(noteFilename: "a.md", frames: [
                 "built-in": StoredFrame(x: 100, y: 200, width: 692, height: 400),
             ])]
             // The update bookkeeping goes through the same file (decision 136). A state.json that
@@ -247,7 +247,7 @@ func runStateTests() {
             let (loaded, outcome) = store.load(default: AppState())
             Check.equal(outcome, JSONFileStore<AppState>.Outcome.loaded)
             Check.equal(loaded, state)
-            Check.equal(loaded.plumes.first?.frames["built-in"]?.rect.width, 692)
+            Check.equal(loaded.panels.first?.frames["built-in"]?.rect.width, 692)
             Check.equal(loaded.availableUpdate, "v0.6.6")
         }
 
@@ -326,7 +326,7 @@ func runStateTests() {
 
         Check.test("a height dragged on one display does not follow you to the other") {
             let main = "AAA-1920x1080", portrait = "BBB-1080x1920"
-            let plume = PlumeState(
+            let panel = PanelState(
                 frames: [
                     main: StoredFrame(x: 0, y: 0, width: 700, height: 300),      // wide and short
                     portrait: StoredFrame(x: 0, y: 0, width: 360, height: 900),  // narrow and tall
@@ -336,30 +336,30 @@ func runStateTests() {
                 // one number for the whole panel, and the bug was reading it directly.
                 manualHeight: 900
             )
-            Check.equal(plume.heldHeight(onDisplay: main), 300, "the main display's own height")
-            Check.equal(plume.heldHeight(onDisplay: portrait), 900)
+            Check.equal(panel.heldHeight(onDisplay: main), 300, "the main display's own height")
+            Check.equal(panel.heldHeight(onDisplay: portrait), 900)
         }
 
         Check.test("a display the panel has not been sized on falls back to the last drag") {
-            let plume = PlumeState(
+            let panel = PanelState(
                 frames: ["AAA-1920x1080": StoredFrame(x: 0, y: 0, width: 700, height: 300)],
                 autoSizing: false,
                 manualHeight: 300
             )
             Check.equal(
-                plume.heldHeight(onDisplay: "NEW-2560x1440"), 300,
+                panel.heldHeight(onDisplay: "NEW-2560x1440"), 300,
                 "a new monitor inherits the height you chose, like it inherits the width"
             )
         }
 
         Check.test("with auto-sizing on there is no held height anywhere") {
-            let plume = PlumeState(
+            let panel = PanelState(
                 frames: ["AAA-1920x1080": StoredFrame(x: 0, y: 0, width: 700, height: 300)],
                 autoSizing: true,
                 manualHeight: nil
             )
-            Check.equal(plume.heldHeight(onDisplay: "AAA-1920x1080"), nil, "the note decides")
-            Check.equal(plume.heldHeight(onDisplay: "NEW-2560x1440"), nil)
+            Check.equal(panel.heldHeight(onDisplay: "AAA-1920x1080"), nil, "the note decides")
+            Check.equal(panel.heldHeight(onDisplay: "NEW-2560x1440"), nil)
         }
 
         // Frames filed under the display ID, which macOS re-issues on every power cycle. The Mac
@@ -390,21 +390,21 @@ func runStateTests() {
             try? Data(json.utf8).write(to: url)
 
             let (loaded, _) = JSONFileStore<AppState>(url: url).load(default: AppState())
-            guard let plume = loaded.plumes.first else {
+            guard let panel = loaded.panels.first else {
                 return Check.expect(false, "no panel decoded")
             }
 
-            Check.equal(plume.frames.count, 2, "three ID-keyed frames dropped")
+            Check.equal(panel.frames.count, 2, "three ID-keyed frames dropped")
             Check.expect(
-                plume.frames["DA50421B-C4EE-4978-9813-F642FDDDEF28-1920x1080"] != nil,
+                panel.frames["DA50421B-C4EE-4978-9813-F642FDDDEF28-1920x1080"] != nil,
                 "a UUID key is kept"
             )
             Check.expect(
-                plume.frames["id99-1512x982"] != nil,
+                panel.frames["id99-1512x982"] != nil,
                 "so is the fallback for a display that refuses a UUID"
             )
-            Check.equal(plume.lastSize?.width, 434, "and the size to seed a new display survives")
-            Check.equal(plume.lastSize?.height, 576)
+            Check.equal(panel.lastSize?.width, 434, "and the size to seed a new display survives")
+            Check.equal(panel.lastSize?.height, 576)
         }
     }
 }

@@ -180,7 +180,7 @@ final class MenuBarController: NSObject {
         // equivalent, and `toggle` ignores a second call within a quarter second: the combination is
         // registered globally with Carbon (decision 9), and while Plume is frontmost — which is only
         // ever the Settings window — both would fire for one press.
-        let show = NSMenuItem(title: tr("menubar.show"), action: #selector(showPlume), keyEquivalent: "")
+        let show = NSMenuItem(title: tr("menubar.show"), action: #selector(showPanel), keyEquivalent: "")
         show.target = self
         if let key = hotkey.menuKeyEquivalent {
             show.keyEquivalent = key
@@ -505,7 +505,7 @@ final class MenuBarController: NSObject {
 
     // MARK: - Actions
 
-    @objc private func showPlume() { onShow?() }
+    @objc private func showPanel() { onShow?() }
     @objc private func newNote() { onNewNote?() }
     @objc private func browse() { onBrowse?() }
     @objc private func actionPanel() { onActions?() }

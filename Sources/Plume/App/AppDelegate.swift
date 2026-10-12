@@ -14,7 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let state = StateStore()
 
     private var vault: VaultService!
-    private var plume: PlumeController!
+    private var panelController: PanelController!
     private var menuBar: MenuBarController!
     private var hotkey: GlobalHotkey!
     private var watcher: VaultWatcher?
@@ -40,11 +40,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         vault = VaultService(vault: settings.value.vaultURL)
         currentVaultURL = settings.value.vaultURL
-        plume = PlumeController(vault: vault, state: state, settings: settings)
-        plume.onPinsChanged = { [weak self] in self?.refreshMenuBar() }
-        plume.onVaultMissing = { [weak self] in self?.handleVaultMissing() }
-        plume.onOpenSettings = { [weak self] in self?.openSettingsWindow() }
-        plume.onSummoned = { [weak self] in self?.checkForUpdateIfDue() }
+        panelController = PanelController(vault: vault, state: state, settings: settings)
+        panelController.onPinsChanged = { [weak self] in self?.refreshMenuBar() }
+        panelController.onVaultMissing = { [weak self] in self?.handleVaultMissing() }
+        panelController.onOpenSettings = { [weak self] in self?.openSettingsWindow() }
+        panelController.onSummoned = { [weak self] in self?.checkForUpdateIfDue() }
 
         installMenuBarItem()
         installHotkey()
@@ -117,11 +117,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // when the vault path changes is written against the *new* folder under the old note's
             // name, or not at all. Safe rather than a race for the same reason: vault I/O is one
             // serial queue, so this write runs with the old location before `setVault` changes it.
-            plume?.flush(trigger: .noteSwitched)
+            panelController?.flush(trigger: .noteSwitched)
             currentVaultURL = new.vaultURL
             vault?.setVault(new.vaultURL)
             startWatching()
-            plume?.openLastUsedNote()
+            panelController?.openLastUsedNote()
         }
 
         // Before anything below rebuilds UI, so it all comes out in the new language.
@@ -132,7 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyDockIcon()
         applyLaunchAtLogin()
         applyMenuBarIconVisibility()
-        plume?.applySettings()
+        panelController?.applySettings()
         settingsWindow?.settingsChanged(new)
         menuBar?.rebuild(hotkey: new.summonHotkey)
         // Shortening the retention should take effect now rather than at the next launch — the
@@ -178,7 +178,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // recreates it, and the old folder is left holding the newest text while the moved
                 // copy is stale and the panel reloads showing the stale one.
                 onWillMoveNotes: { [weak self] in
-                    self?.plume.flush(trigger: .noteSwitched)
+                    self?.panelController.flush(trigger: .noteSwitched)
                     self?.vault.drain()
                 },
                 onUpdateStatus: { [weak self] in self?.recordUpdateStatus($0) },
@@ -188,10 +188,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // Same as the hand-edited path above, and this is the one people actually use: the
                 // Sync radio and "Notes folder" both land here, and *Move Notes* (decision 30) moves
                 // the file the buffer is pointing at.
-                self.plume.flush(trigger: .noteSwitched)
+                self.panelController.flush(trigger: .noteSwitched)
                 self.vault.setVault(url)
                 self.startWatching()
-                self.plume.openLastUsedNote()
+                self.panelController.openLastUsedNote()
                 self.refreshMenuBar()
             }
         }
@@ -216,9 +216,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        plume?.stopDockSpaceDetection()
+        panelController?.stopDockSpaceDetection()
         // Decision 10's third immediate flush. Everything else is recoverable; unsaved text is not.
-        plume?.flush(trigger: .quitting)
+        panelController?.flush(trigger: .quitting)
         // And wait for it. Decision 10 lists quit as an immediate flush, but "immediate" only meant
         // "enqueued immediately" — see `VaultService.drain`. A draft note exists nowhere but in the
         // buffer until that write lands, which is what makes the difference load-bearing.
@@ -232,7 +232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Plume has no Dock icon by default, but if `showDockIcon` is on, clicking it should summon
     /// rather than do nothing.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        plume?.summon()
+        panelController?.summon()
         return true
     }
 
@@ -304,7 +304,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.addButton(withTitle: tr("vault.chooseFolder"))
         alert.addButton(withTitle: tr("vault.quit"))
 
-        guard PlumePanel.steppingAside({ alert.runModal() }) == .alertFirstButtonReturn else {
+        guard PanelWindow.steppingAside({ alert.runModal() }) == .alertFirstButtonReturn else {
             NSApp.terminate(nil)
             return
         }
@@ -317,7 +317,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.prompt = tr("folderPanel.prompt")
         panel.message = tr("folderPanel.message")
 
-        guard PlumePanel.steppingAside({ panel.runModal() }) == .OK, let chosen = panel.url else {
+        guard PanelWindow.steppingAside({ panel.runModal() }) == .OK, let chosen = panel.url else {
             presentVaultChooser(message: message, detail: detail)
             return
         }
@@ -330,7 +330,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             vault.setVault(chosen)
             startWatching()
-            plume.openLastUsedNote()
+            panelController.openLastUsedNote()
         }
     }
 
@@ -352,7 +352,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard !names.isEmpty else { return }
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    box.value?.plume?.vaultChanged(filenames: names)
+                    box.value?.panelController?.vaultChanged(filenames: names)
                     box.value?.refreshMenuBar()
                 }
             }
@@ -376,7 +376,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Hotkey
 
     private func installHotkey() {
-        hotkey = GlobalHotkey { [weak self] in self?.plume.toggle() }
+        hotkey = GlobalHotkey { [weak self] in self?.panelController.toggle() }
 
         guard hotkey.register(settings.value.summonHotkey) else {
             let combo = settings.value.summonHotkey.displayString
@@ -396,7 +396,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         gitSync.beforeCycle = { [weak self] in
             // What is on screen, on disk, before git reads the folder — and waited for, for the
             // reason `onWillMoveNotes` waits: `flush` only enqueues.
-            self?.plume.flush(trigger: .reloadPending)
+            self?.panelController.flush(trigger: .reloadPending)
             self?.vault.drain()
         }
         gitSync.onStatusChange = { [weak self] status in
@@ -413,13 +413,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menuBar = MenuBarController(hotkey: settings.value.summonHotkey)
         menuBar.pinnedNotes = { [weak self] in self?.pinnedNotes() ?? [] }
-        menuBar.onShow = { [weak self] in self?.plume.summon() }
+        menuBar.onShow = { [weak self] in self?.panelController.summon() }
         menuBar.onNewNote = { [weak self] in
-            self?.plume.summon()
-            self?.plume.createNote(title: "")
+            self?.panelController.summon()
+            self?.panelController.createNote(title: "")
         }
-        menuBar.onBrowse = { [weak self] in self?.plume.openSwitcher() }
-        menuBar.onActions = { [weak self] in self?.plume.openActions() }
+        menuBar.onBrowse = { [weak self] in self?.panelController.openSwitcher() }
+        menuBar.onActions = { [weak self] in self?.panelController.openActions() }
         menuBar.onSettings = { [weak self] in self?.openSettingsWindow() }
         menuBar.onOpenRelease = { NSWorkspace.shared.open(UpdateChecker.releasePage(for: $0)) }
         menuBar.onSyncNow = { [weak self] in self?.gitSync.syncNow() }
@@ -431,8 +431,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar.onOpenConflict = { [weak self] file in
             guard let self else { return }
             if NoteFilename.isNoteFile(file) {
-                self.plume.summon()
-                self.plume.open(file)
+                self.panelController.summon()
+                self.panelController.open(file)
             } else {
                 NSWorkspace.shared.activateFileViewerSelecting([self.settings.value.vaultURL.appendingPathComponent(file)])
             }
@@ -444,8 +444,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Summon first: the pinned section exists so a pinned note is one click away from anywhere,
         // and opening one into a panel that is still offscreen would be a click that does nothing.
         menuBar.onOpenNote = { [weak self] filename in
-            self?.plume.summon()
-            self?.plume.open(filename)
+            self?.panelController.summon()
+            self?.panelController.open(filename)
         }
     }
 
@@ -530,8 +530,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// a notice into a parked window where nobody would ever see it. Skipped, it comes round again
     /// with tomorrow's check.
     private func announceUpdate() {
-        guard let version = latestAvailableVersion, plume.isVisible else { return }
-        plume.showToast(tr("update.toast", ["version": version]), dwell: PlumeController.newsDwell)
+        guard let version = latestAvailableVersion, panelController.isVisible else { return }
+        panelController.showToast(tr("update.toast", ["version": version]), dwell: PanelController.newsDwell)
     }
 
     /// Note titles by filename, kept warm for the menu bar.
@@ -601,7 +601,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         browseNotesItem?.target = self
         applyMenuShortcuts()
         fileMenu.addItem(.separator())
-        fileMenu.addItem(withTitle: tr("menu.closePlume"), action: #selector(closePlume), keyEquivalent: "w").target = self
+        fileMenu.addItem(withTitle: tr("menu.closePanel"), action: #selector(closePanel), keyEquivalent: "w").target = self
         fileItem.submenu = fileMenu
         main.addItem(fileItem)
 
@@ -658,16 +658,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func newNote() {
-        plume?.summon()
-        plume?.createNote(title: "")
+        panelController?.summon()
+        panelController?.createNote(title: "")
     }
 
     @objc private func browseNotes() {
-        plume?.openSwitcher()
+        panelController?.openSwitcher()
     }
 
-    @objc private func closePlume() {
-        plume?.dismiss()
+    @objc private func closePanel() {
+        panelController?.dismiss()
     }
 
     @objc private func openSettings() {

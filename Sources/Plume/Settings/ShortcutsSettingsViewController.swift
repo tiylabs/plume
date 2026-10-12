@@ -30,7 +30,7 @@ import PlumeKit
 final class ShortcutsSettingsViewController: NSViewController {
 
     private let settings: SettingsStore
-    private var plumeRecorders: [(action: String, recorder: PlumeShortcutRecorderView)] = []
+    private var panelRecorders: [(action: String, recorder: PlumeShortcutRecorderView)] = []
 
     init(settings: SettingsStore) {
         self.settings = settings
@@ -63,7 +63,7 @@ final class ShortcutsSettingsViewController: NSViewController {
             recorder.onRecord = { [weak self] binding in
                 self?.settings.update { $0.shortcuts[action.key] = binding }
             }
-            plumeRecorders.append((action.key, recorder))
+            panelRecorders.append((action.key, recorder))
             rows.append(SettingsRow(title: Settings.label(of: action.key), control: recorder))
         }
         flush()
@@ -98,7 +98,7 @@ final class ShortcutsSettingsViewController: NSViewController {
     }
 
     func settingsChanged(_ new: Settings) {
-        for entry in plumeRecorders {
+        for entry in panelRecorders {
             entry.recorder.setBinding(new.shortcut(entry.action))
         }
     }

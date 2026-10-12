@@ -76,10 +76,10 @@ func runCompatibilityTests() {
 
         Check.test("state.json written by an older build decodes: panels are stored under plumes") {
             let state = try! decoder().decode(AppState.self, from: fixture("state-legacy.json"))
-            Check.equal(state.plumes.count, 1, "the panel list is read from the `plumes` key")
-            Check.equal(state.plumes.first?.noteFilename, "2026-08-11-1453-first-few-words.md")
-            Check.equal(state.plumes.first?.manualHeight, 420)
-            Check.equal(state.plumes.first?.frames["primary"]?.width, 460)
+            Check.equal(state.panels.count, 1, "the panel list is read from the `plumes` key")
+            Check.equal(state.panels.first?.noteFilename, "2026-08-11-1453-first-few-words.md")
+            Check.equal(state.panels.first?.manualHeight, 420)
+            Check.equal(state.panels.first?.frames["primary"]?.width, 460)
             Check.equal(state.notes.count, 2)
             Check.equal(state.note("2026-08-11-1453-first-few-words.md").isPinned, true)
             Check.equal(state.note("2026-08-11-1453-first-few-words.md").caretOffset, 42)

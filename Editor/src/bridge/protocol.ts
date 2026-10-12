@@ -1,7 +1,7 @@
 /*
  * The shape of everything the page can tell Swift.
  *
- * Mirrors `PlumeMessage` in Sources/Plume/Bridge/EditorWebView.swift. Neither side is checked by a
+ * Mirrors `BridgeMessage` in Sources/Plume/Bridge/EditorWebView.swift. Neither side is checked by a
  * compiler against the other, so `Editor/tests/bridge-names.mjs` reads both and fails when the sets
  * of names disagree.
  */

@@ -12,7 +12,7 @@ import PlumeKit
 /// Borderless because the panel draws its own rounding, hairline and material in CSS (see the comment
 /// at the top of `plume.css`) — the window is a transparent hole the web view fills.
 @MainActor
-final class PlumePanel: NSPanel {
+final class PanelWindow: NSPanel {
 
     /// Rule 2's width. Resizing is allowed between `PanelGeometry.minimumWidth` and
     /// `maximumWidth` — the content has its own measure, so past that a wider panel buys gutters
@@ -130,7 +130,7 @@ final class PlumePanel: NSPanel {
     ///   happen in the same millisecond, so nothing is drawn on screen in between.
     ///
     /// The other half of the fix is that `parked` has to be true in the first place. It was not:
-    /// `PlumeController.init` parked the panel at startup with a bare `setFrameOrigin` on its own copy
+    /// `PanelController.init` parked the panel at startup with a bare `setFrameOrigin` on its own copy
     /// of the literal, so a panel that had never been summoned was offscreen with `parked` false and
     /// this guard switched off. That is now `parkBeforeFirstSummon`.
     ///
@@ -371,7 +371,7 @@ final class PlumePanel: NSPanel {
     }
 }
 
-extension PlumePanel {
+extension PanelWindow {
 
     /// Steps every panel out of the way of a window the app has put in front on purpose.
     ///
@@ -389,15 +389,15 @@ extension PlumePanel {
     /// `isFloatingPanel` is cleared as well, because it owns the level — setting `level` alone left
     /// the panel back at `.floating` and the save panel still behind it.
     static func stepAside() {
-        for plume in NSApp.windows.compactMap({ $0 as? PlumePanel }) {
-            plume.steppedAside = true
+        for window in NSApp.windows.compactMap({ $0 as? PanelWindow }) {
+            window.steppedAside = true
         }
     }
 
     /// Puts them back. Safe to call when nothing stepped aside.
     static func resumeFloating() {
-        for plume in NSApp.windows.compactMap({ $0 as? PlumePanel }) {
-            plume.steppedAside = false
+        for window in NSApp.windows.compactMap({ $0 as? PanelWindow }) {
+            window.steppedAside = false
         }
     }
 

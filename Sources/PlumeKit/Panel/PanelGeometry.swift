@@ -26,9 +26,9 @@ public enum PanelGeometry {
     ///
     /// The floor is still there for a short panel, where the proportional answer would be tighter
     /// than the minimum margins.
-    public static func plumeHeight(forOverlay panelHeight: CGFloat) -> CGFloat {
-        let proportional = panelHeight / 0.75
-        let minimum = overlayTopMinimum + panelHeight + overlayBottomMinimum
+    public static func panelHeight(forOverlay overlayHeight: CGFloat) -> CGFloat {
+        let proportional = overlayHeight / 0.75
+        let minimum = overlayTopMinimum + overlayHeight + overlayBottomMinimum
         return (proportional > minimum ? proportional : minimum).rounded()
     }
 

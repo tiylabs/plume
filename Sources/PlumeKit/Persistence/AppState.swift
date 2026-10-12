@@ -24,7 +24,7 @@ public struct AppState: Codable, Equatable, Sendable {
 
     /// Open panels. A list, not a single optional, because a note is an independently ownable panel
     /// (decision 9). v0.1 shows one; nothing here assumes that.
-    public var plumes: [PlumeState]
+    public var panels: [PanelState]
 
     /// Set the first time Plume creates a vault, and never cleared.
     ///
@@ -56,17 +56,27 @@ public struct AppState: Codable, Equatable, Sendable {
     /// still carries the key, and decoding ignores it.
     public var availableUpdate: String?
 
+    /// The JSON keys. `panels` is stored as `plumes`, the name it had when `state.json` first shipped.
+    ///
+    /// The key does not follow the Swift property on purpose: the file is read by this build after an
+    /// upgrade and by an older one after a downgrade, and a renamed key would silently read as "no
+    /// panels", dropping the remembered frames and note. `CompatibilityTests` holds this to the byte.
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, notes, vaultEverCreated, lastUpdateCheck, availableUpdate
+        case panels = "plumes"
+    }
+
     public init(
         schemaVersion: Int = AppState.currentSchemaVersion,
         notes: [String: NoteState] = [:],
-        plumes: [PlumeState] = [],
+        panels: [PanelState] = [],
         vaultEverCreated: Bool = false,
         lastUpdateCheck: Date? = nil,
         availableUpdate: String? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.notes = notes
-        self.plumes = plumes
+        self.panels = panels
         self.vaultEverCreated = vaultEverCreated
         self.lastUpdateCheck = lastUpdateCheck
         self.availableUpdate = availableUpdate
@@ -78,7 +88,7 @@ public struct AppState: Codable, Equatable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? Self.currentSchemaVersion
         notes = try c.decodeIfPresent([String: NoteState].self, forKey: .notes) ?? [:]
-        plumes = try c.decodeIfPresent([PlumeState].self, forKey: .plumes) ?? []
+        panels = try c.decodeIfPresent([PanelState].self, forKey: .panels) ?? []
 
         // Defaults to false, but a state file that already knows about notes plainly had a vault —
         // so an upgrade from a build predating this flag does not get offered a fresh welcome note.
@@ -145,7 +155,7 @@ public struct NoteState: Codable, Equatable, Sendable {
 
 // MARK: - Plumes
 
-public struct PlumeState: Codable, Equatable, Sendable, Identifiable {
+public struct PanelState: Codable, Equatable, Sendable, Identifiable {
 
     public var id: UUID
 
@@ -232,7 +242,7 @@ public struct PlumeState: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
-extension PlumeState {
+extension PanelState {
 
     /// The height to hold on a given display while auto-sizing is off.
     ///
@@ -355,8 +365,8 @@ extension AppState {
     /// and caret because a sync was slow would be the same class of bug as decision 13's.
     public mutating func forgetNotes(missingFrom present: Set<String>) {
         notes = notes.filter { present.contains($0.key) }
-        for i in plumes.indices where plumes[i].noteFilename.map({ !present.contains($0) }) ?? false {
-            plumes[i].noteFilename = nil
+        for i in panels.indices where panels[i].noteFilename.map({ !present.contains($0) }) ?? false {
+            panels[i].noteFilename = nil
         }
     }
 }

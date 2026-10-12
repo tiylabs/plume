@@ -9,7 +9,7 @@ private let builtIn = CGRect(x: 0, y: 0, width: 1512, height: 945)
 private let external = CGRect(x: 1512, y: 0, width: 2560, height: 1415)
 
 private let titleBar: CGFloat = 40
-private let plumeWidth: CGFloat = 692
+private let panelWidth: CGFloat = 692
 
 func runPanelGeometryTests() {
     Check.suite("Plume geometry") {
@@ -36,9 +36,9 @@ func runPanelGeometryTests() {
 
         Check.test("first launch centres horizontally in the top third") {
             let f = PanelGeometry.firstLaunchFrame(
-                width: plumeWidth, height: 400, visibleFrame: builtIn
+                width: panelWidth, height: 400, visibleFrame: builtIn
             )
-            Check.equal(f.width, plumeWidth)
+            Check.equal(f.width, panelWidth)
             Check.equal(f.midX, builtIn.midX, "horizontally centred")
             Check.expect(f.maxY < builtIn.maxY, "leaves a gap above")
             Check.expect(f.maxY > builtIn.midY, "sits in the upper half")
@@ -56,17 +56,17 @@ func runPanelGeometryTests() {
         // MARK: - Rule 2, Grow
 
         Check.test("height grows downward with the top edge pinned") {
-            let start = CGRect(x: 100, y: 600, width: plumeWidth, height: 200)
+            let start = CGRect(x: 100, y: 600, width: panelWidth, height: 200)
             let grown = PanelGeometry.grown(from: start, toContentHeight: 320, visibleFrame: builtIn)
             Check.equal(grown.frame.maxY, start.maxY, "top edge must not move")
             Check.equal(grown.frame.height, 320)
             Check.equal(grown.frame.minY, start.maxY - 320, "origin moves down, not up")
-            Check.equal(grown.frame.width, plumeWidth, "width never changes")
+            Check.equal(grown.frame.width, panelWidth, "width never changes")
             Check.expect(!grown.scrolls)
         }
 
         Check.test("deleting text shrinks the panel back, still from the top") {
-            let start = CGRect(x: 100, y: 400, width: plumeWidth, height: 400)
+            let start = CGRect(x: 100, y: 400, width: panelWidth, height: 400)
             let shrunk = PanelGeometry.grown(from: start, toContentHeight: 180, visibleFrame: builtIn)
             Check.equal(shrunk.frame.maxY, start.maxY)
             Check.equal(shrunk.frame.height, 180)
@@ -74,7 +74,7 @@ func runPanelGeometryTests() {
 
         Check.test("growth stops 24px from the bottom and the note scrolls instead") {
             // Top edge near the top of the screen, content far taller than the screen.
-            let start = CGRect(x: 100, y: 800, width: plumeWidth, height: 100)
+            let start = CGRect(x: 100, y: 800, width: panelWidth, height: 100)
             let grown = PanelGeometry.grown(from: start, toContentHeight: 5000, visibleFrame: builtIn)
             Check.equal(grown.frame.maxY, start.maxY, "top edge still pinned")
             Check.equal(
@@ -86,7 +86,7 @@ func runPanelGeometryTests() {
         }
 
         Check.test("never shrinks below a usable minimum") {
-            let start = CGRect(x: 100, y: 600, width: plumeWidth, height: 300)
+            let start = CGRect(x: 100, y: 600, width: panelWidth, height: 300)
             let grown = PanelGeometry.grown(from: start, toContentHeight: 10, visibleFrame: builtIn)
             Check.equal(grown.frame.height, PanelGeometry.minimumHeight)
         }
@@ -96,12 +96,12 @@ func runPanelGeometryTests() {
         Check.test("a frame on the display being summoned to is restored untouched") {
             // "Stay put" is per display: the frame handed in was looked up under *this* display's
             // key, so the case that means anything is a frame that belongs here.
-            let remembered = CGRect(x: 300, y: 400, width: plumeWidth, height: 400)
+            let remembered = CGRect(x: 300, y: 400, width: panelWidth, height: 400)
             let restored = PanelGeometry.restore(
                 remembered: remembered,
                 titleBarHeight: titleBar,
                 activeVisibleFrame: builtIn,
-                defaultWidth: plumeWidth,
+                defaultWidth: panelWidth,
                 defaultHeight: 400
             )
             Check.equal(restored, remembered, "stay put means stay put")
@@ -120,7 +120,7 @@ func runPanelGeometryTests() {
                 remembered: onTheOtherScreen,
                 titleBarHeight: titleBar,
                 activeVisibleFrame: builtIn,
-                defaultWidth: plumeWidth,
+                defaultWidth: panelWidth,
                 defaultHeight: 400
             )
             Check.expect(
@@ -141,7 +141,7 @@ func runPanelGeometryTests() {
                 remembered: tooNarrow,
                 titleBarHeight: titleBar,
                 activeVisibleFrame: builtIn,
-                defaultWidth: plumeWidth,
+                defaultWidth: panelWidth,
                 defaultHeight: 400
             )
             Check.equal(restored.width, PanelGeometry.minimumWidth)
@@ -150,12 +150,12 @@ func runPanelGeometryTests() {
 
         Check.test("a frame on a screen that went away comes back to the active display") {
             // Remembered on the external monitor, which is no longer connected.
-            let remembered = CGRect(x: 3000, y: 1100, width: plumeWidth, height: 400)
+            let remembered = CGRect(x: 3000, y: 1100, width: panelWidth, height: 400)
             let restored = PanelGeometry.restore(
                 remembered: remembered,
                 titleBarHeight: titleBar,
                 activeVisibleFrame: builtIn,
-                defaultWidth: plumeWidth,
+                defaultWidth: panelWidth,
                 defaultHeight: 400
             )
             Check.expect(
@@ -166,7 +166,7 @@ func runPanelGeometryTests() {
         }
 
         Check.test("a panel whose title bar is off the top is unreachable") {
-            let offTop = CGRect(x: 100, y: builtIn.maxY - 10, width: plumeWidth, height: 400)
+            let offTop = CGRect(x: 100, y: builtIn.maxY - 10, width: panelWidth, height: 400)
             Check.expect(
                 !PanelGeometry.isReachable(offTop, titleBarHeight: titleBar, onAnyOf: [builtIn]),
                 "title bar above the screen is not grabbable"
@@ -175,7 +175,7 @@ func runPanelGeometryTests() {
 
         Check.test("a panel hanging off the bottom is untidy but still reachable") {
             // Body spills below the screen; the title bar is fully visible, so don't move it.
-            let hanging = CGRect(x: 100, y: -300, width: plumeWidth, height: 500)
+            let hanging = CGRect(x: 100, y: -300, width: panelWidth, height: 500)
             Check.expect(
                 PanelGeometry.isReachable(hanging, titleBarHeight: titleBar, onAnyOf: [builtIn]),
                 "only the title bar decides reachability"
@@ -184,7 +184,7 @@ func runPanelGeometryTests() {
 
         Check.test("a sliver left on screen is not enough to count as reachable") {
             let sliver = CGRect(
-                x: builtIn.maxX - 40, y: 700, width: plumeWidth, height: 400
+                x: builtIn.maxX - 40, y: 700, width: panelWidth, height: 400
             )
             Check.expect(
                 !PanelGeometry.isReachable(sliver, titleBarHeight: titleBar, onAnyOf: [builtIn]),
@@ -197,30 +197,30 @@ func runPanelGeometryTests() {
                 remembered: nil,
                 titleBarHeight: titleBar,
                 activeVisibleFrame: builtIn,
-                defaultWidth: plumeWidth,
+                defaultWidth: panelWidth,
                 defaultHeight: 400
             )
             Check.equal(
                 restored,
-                PanelGeometry.firstLaunchFrame(width: plumeWidth, height: 400, visibleFrame: builtIn)
+                PanelGeometry.firstLaunchFrame(width: panelWidth, height: 400, visibleFrame: builtIn)
             )
         }
 
         Check.test("a panel grown for an overlay leaves room above and below it") {
             let panel: CGFloat = 507   // ⌘K at fourteen rows
-            let plume = PanelGeometry.plumeHeight(forOverlay: panel)
-            let top = plume * 0.15
+            let total = PanelGeometry.panelHeight(forOverlay: panel)
+            let top = total * 0.15
             Check.expect(top >= PanelGeometry.overlayTopMinimum, "top \(top)")
             Check.expect(
-                plume - top - panel >= PanelGeometry.overlayBottomMinimum,
-                "bottom gap \(plume - top - panel)"
+                total - top - panel >= PanelGeometry.overlayBottomMinimum,
+                "bottom gap \(total - top - panel)"
             )
         }
 
-        Check.test("a short overlay still gets the minimum margins rather than a smaller plume") {
+        Check.test("a short overlay still gets the minimum margins rather than a smaller total") {
             let panel: CGFloat = 100
             Check.equal(
-                PanelGeometry.plumeHeight(forOverlay: panel),
+                PanelGeometry.panelHeight(forOverlay: panel),
                 PanelGeometry.overlayTopMinimum + panel + PanelGeometry.overlayBottomMinimum
             )
         }
@@ -236,7 +236,7 @@ func runPanelGeometryTests() {
     }
 }
 
-func runPlumeWidthTests() {
+func runPanelWidthTests() {
     Check.suite("Width has both ends; height has one") {
 
         // Decision 22's own argument, enforced: past the content's measure a wider panel is gutters.
@@ -297,7 +297,7 @@ func runPlumeWidthTests() {
             )
         }
 
-        Check.test("a portrait display cannot make an enormous plume") {
+        Check.test("a portrait display cannot make an enormous total") {
             // 1080×1920 rotated, menu bar off the top. Without the cap this grows past 1890.
             let portrait = CGRect(x: 0, y: 0, width: 1080, height: 1895)
             let top = portrait.maxY - 100
@@ -307,7 +307,7 @@ func runPlumeWidthTests() {
                 "the ceiling, not the screen edge"
             )
 
-            let start = CGRect(x: 0, y: top - 300, width: plumeWidth, height: 300)
+            let start = CGRect(x: 0, y: top - 300, width: panelWidth, height: 300)
             let grown = PanelGeometry.grown(
                 from: start, toContentHeight: 4000, visibleFrame: portrait
             )
@@ -350,7 +350,7 @@ func runPlumeWidthTests() {
             let remembered = CGRect(x: 100, y: 200, width: 500, height: 1600)
             let restored = PanelGeometry.restore(
                 remembered: remembered, titleBarHeight: titleBar,
-                activeVisibleFrame: portrait, defaultWidth: plumeWidth, defaultHeight: 400
+                activeVisibleFrame: portrait, defaultWidth: panelWidth, defaultHeight: 400
             )
             Check.equal(restored.height, PanelGeometry.maximumHeight)
             Check.equal(restored.maxY, remembered.maxY, "the top edge is the one the user reaches for")
@@ -406,10 +406,10 @@ func runPlumeWidthTests() {
                 lastSize: chosen,
                 titleBarHeight: titleBar,
                 activeVisibleFrame: builtIn,
-                defaultWidth: plumeWidth,
+                defaultWidth: panelWidth,
                 defaultHeight: 400
             )
-            Check.equal(restored.width, chosen.width, "not the \(plumeWidth) default")
+            Check.equal(restored.width, chosen.width, "not the \(panelWidth) default")
             Check.equal(restored.height, chosen.height)
             Check.equal(restored.midX, builtIn.midX, "placed like a first launch, sized like yours")
         }
@@ -417,11 +417,11 @@ func runPlumeWidthTests() {
         Check.test("with nothing remembered anywhere the default still applies") {
             let restored = PanelGeometry.restore(
                 remembered: nil, lastSize: nil, titleBarHeight: titleBar,
-                activeVisibleFrame: builtIn, defaultWidth: plumeWidth, defaultHeight: 400
+                activeVisibleFrame: builtIn, defaultWidth: panelWidth, defaultHeight: 400
             )
             Check.equal(
                 restored,
-                PanelGeometry.firstLaunchFrame(width: plumeWidth, height: 400, visibleFrame: builtIn)
+                PanelGeometry.firstLaunchFrame(width: panelWidth, height: 400, visibleFrame: builtIn)
             )
         }
 
@@ -430,7 +430,7 @@ func runPlumeWidthTests() {
                 remembered: nil,
                 lastSize: CGSize(width: 4000, height: 400),
                 titleBarHeight: titleBar,
-                activeVisibleFrame: builtIn, defaultWidth: plumeWidth, defaultHeight: 400
+                activeVisibleFrame: builtIn, defaultWidth: panelWidth, defaultHeight: 400
             )
             Check.equal(restored.width, PanelGeometry.maximumWidth)
         }

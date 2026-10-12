@@ -8,7 +8,7 @@ import WebKit
 /// Mirrors `OutboundMessage` in `Editor/src/main.ts` exactly. Decoded into a Swift enum at the
 /// boundary rather than passed around as a dictionary, so a message the web layer stops sending
 /// becomes a compile error here instead of a silent no-op at runtime.
-enum PlumeMessage {
+enum BridgeMessage {
     case ready
     case edited(text: String, caret: Int)
     case caret(caret: Int, scrollLine: Int)
@@ -58,7 +58,7 @@ enum PlumeMessage {
     case forgetDeleted(storedName: String)
     /// ⌘= / ⌘− / ⌘0. Swift owns `Settings.textSize`, so the web layer asks rather than sets.
     case textSize(action: String)
-    /// ⌘[ / ⌘]. The visit history lives in `PlumeController`, so this only asks.
+    /// ⌘[ / ⌘]. The visit history lives in `PanelController`, so this only asks.
     case navigate(back: Bool)
     /// Where the window may be dragged from, in CSS pixels with a top-left origin. Sent by the web
     /// layer because only it knows where its own buttons ended up.
@@ -172,7 +172,7 @@ enum PlumeMessage {
 
 @MainActor
 protocol EditorWebViewDelegate: AnyObject {
-    func editor(_ editor: EditorWebView, didReceive message: PlumeMessage)
+    func editor(_ editor: EditorWebView, didReceive message: BridgeMessage)
 }
 
 /// The panel's web view, and the Swift half of decision 4's bridge.
@@ -584,14 +584,14 @@ private final class ClickThroughWebView: WKWebView {
 /// it. `WKUserContentController` retains its handlers for the lifetime of the configuration, which
 /// makes a direct conformance on `EditorWebView` an unbreakable cycle.
 private final class MessageBridge: NSObject, WKScriptMessageHandler {
-    @MainActor var onMessage: ((PlumeMessage) -> Void)?
+    @MainActor var onMessage: ((BridgeMessage) -> Void)?
 
     func userContentController(
         _ controller: WKUserContentController,
         didReceive message: WKScriptMessage
     ) {
         MainActor.assumeIsolated {
-            guard let decoded = PlumeMessage(body: message.body) else { return }
+            guard let decoded = BridgeMessage(body: message.body) else { return }
             onMessage?(decoded)
         }
     }

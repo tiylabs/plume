@@ -217,7 +217,7 @@ final class VaultService: @unchecked Sendable {
     /// .quitting)` and then returns, and whether the write ever ran was down to how long macOS
     /// happened to take to tear the process down. That was a bounded risk while every note already
     /// had a file — you could lose the last half-second of typing. A draft has no file at all
-    /// (see `PlumeController.isDraft`), so the same race loses the whole note.
+    /// (see `PanelController.isDraft`), so the same race loses the whole note.
     ///
     /// Bounded rather than a bare `queue.sync`: `materialize` polls iCloud for up to two minutes on
     /// this queue, and a quit that hangs for two minutes is a worse bug than the one being fixed.
@@ -350,7 +350,7 @@ final class VaultService: @unchecked Sendable {
     /// The name decision 103 says this note should now have, applied. Nil title changes are cheap:
     /// `NoteNaming.rename` returns nil and nothing touches the disk.
     ///
-    /// The listing has to happen here rather than in `PlumeController` because `existing` is a read of
+    /// The listing has to happen here rather than in `PanelController` because `existing` is a read of
     /// the vault, and every read of the vault goes on this queue.
     func renameFollowingTitle(
         _ filename: String,
