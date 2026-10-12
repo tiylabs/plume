@@ -99,8 +99,6 @@ public struct AppState: Codable, Equatable, Sendable {
     }
 }
 
-
-
 // MARK: - Convenience
 
 extension AppState {
