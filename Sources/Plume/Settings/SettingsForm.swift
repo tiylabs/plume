@@ -3,7 +3,7 @@ import PlumeKit
 
 /// The Settings window's layout system — one page builder, one card, one row, shared by every tab.
 ///
-/// The spec is `Design/settings-design-spec.md`; the numbers below are its tokens, and this is the one
+/// The spec is `Design/Specs/settings-design-spec.md`; the numbers below are its tokens, and this is the one
 /// place they are written down. A tab never sets a margin, a width or a font of its own.
 ///
 /// The shape is macOS System Settings': a page is a column of **cards**; a card is a rounded group of

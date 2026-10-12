@@ -1,6 +1,6 @@
 #!/usr/bin/env swift
 //
-// Turns the two design exports in Design/ into the assets the app bundle wants.
+// Turns the two design exports in Design/Icons/ into the assets the app bundle wants.
 //
 //   Scripts/tools/make-icons.swift
 //   Scripts/tools/make-icons.swift --app-only   leave menu-bar resources unchanged
@@ -9,8 +9,8 @@
 // Run it by hand when the artwork changes; the outputs are committed, so a plain checkout builds
 // without needing to regenerate anything. `Scripts/build-app.sh` picks both of them up on its own.
 //
-//   Design/AppIcon.png       square PNG      ->  App/AppIcon.icns
-//   Design/MenuBarIcon.png   monochrome PNG  ->  App/Resources/MenuBar{,@2x,@3x}.png
+//   Design/Icons/AppIcon.png       square PNG      ->  App/AppIcon.icns
+//   Design/Icons/MenuBarIcon.png   monochrome PNG  ->  App/Resources/MenuBar{,@2x,@3x}.png
 //
 // The app export already includes the intended transparent margin: keep its entire canvas and
 // alpha unchanged, and only resample for smaller icon representations. The menu-bar export is
@@ -246,7 +246,7 @@ let root = URL(fileURLWithPath: CommandLine.arguments.first.map {
         .deletingLastPathComponent().path
 } ?? FileManager.default.currentDirectoryPath)
 
-let design = root.appendingPathComponent("Design")
+let design = root.appendingPathComponent("Design/Icons")
 let appFolder = root.appendingPathComponent("App")
 let resources = appFolder.appendingPathComponent("Resources")
 let arguments = Array(CommandLine.arguments.dropFirst())
