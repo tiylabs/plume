@@ -1,27 +1,6 @@
 import CryptoKit
 import Foundation
 
-/// Content hashing, used to tell our own writes apart from everyone else's.
-///
-/// Decision 10 is explicit that echoes are filtered by hash and **not** by modification time. mtime
-/// is the obvious choice and the wrong one: an atomic replace changes it, sync daemons rewrite it,
-/// and two edits inside the same second can leave it unchanged — so it produces both false alarms
-/// and misses. A hash answers the only question worth asking, which is whether the bytes on disk are
-/// the bytes we last wrote.
-public enum ContentHash {
-
-    public static func of(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-    }
-
-    /// Hashes the UTF-8 encoding, which is what actually reaches the disk. Hashing the `String`
-    /// instead would make two byte sequences that normalise to the same characters compare equal,
-    /// and this whole mechanism exists to notice byte-level differences.
-    public static func of(_ text: String) -> String {
-        of(Data(text.utf8))
-    }
-}
-
 /// What to do when the file underneath an open note has changed.
 ///
 /// This is decision 8, which defers conflict *handling* but not conflict *detection*: v0.1 must
@@ -126,39 +105,5 @@ public enum VaultSync {
             baselineHash: baseline.map(ContentHash.of),
             bufferHash: ContentHash.of(buffer)
         )
-    }
-}
-
-/// When bytes are allowed to hit the disk.
-///
-/// Decision 10: 500 ms after typing stops, and immediately on dismiss, blur and quit. The debounce
-/// keeps a sync daemon from seeing a write per keystroke; the three immediate flushes are the moments
-/// that actually matter, because a panel that is summoned and banished constantly is a panel whose
-/// content must be safe the instant it goes away.
-public enum WritePolicy {
-
-    public static let debounce: TimeInterval = 0.5
-
-    public enum Trigger: Equatable, Sendable {
-        case typingStopped
-        case dismissed
-        case lostFocus
-        case quitting
-        case noteSwitched
-        /// The vault watcher wants a clean file before it reloads.
-        case reloadPending
-
-        /// Whether this trigger waits out the debounce or writes now.
-        public var isImmediate: Bool {
-            switch self {
-            case .typingStopped: return false
-            case .dismissed, .lostFocus, .quitting, .noteSwitched, .reloadPending: return true
-            }
-        }
-    }
-
-    /// How long to wait before writing, given what prompted it.
-    public static func delay(for trigger: Trigger) -> TimeInterval {
-        trigger.isImmediate ? 0 : debounce
     }
 }
