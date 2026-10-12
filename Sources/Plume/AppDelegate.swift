@@ -335,20 +335,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startWatching() {
         watcher?.stop()
-        let watcher = VaultWatcher { [weak self] paths in
+        // Captured once, outside the `@Sendable` handler: that handler runs on the watcher's queue and
+        // hands `self` to the main queue twice, which Swift 6.2's region checker rejects when each
+        // hop captures `self` separately. The delegate lives for the process (see `main.swift`).
+        let box = WeakDelegate(self)
+        let watcher = VaultWatcher { paths in
             // Git's own bookkeeping is not the notes changing; counting it would have every sync
             // cycle look like somebody typing.
             if paths.contains(where: { !$0.contains("/.git/") && !$0.hasSuffix("/.git") }) {
                 DispatchQueue.main.async {
-                    MainActor.assumeIsolated { self?.gitSync.vaultDidChange() }
+                    MainActor.assumeIsolated { box.value?.gitSync.vaultDidChange() }
                 }
             }
             let names = VaultWatcher.noteFilenames(in: paths)
             guard !names.isEmpty else { return }
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    self?.plume?.vaultChanged(filenames: names)
-                    self?.refreshMenuBar()
+                    box.value?.plume?.vaultChanged(filenames: names)
+                    box.value?.refreshMenuBar()
                 }
             }
         }
@@ -668,4 +672,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openSettings() {
         openSettingsWindow()
     }
+}
+
+/// A weak reference that may cross into the watcher's `@Sendable` handler. It is only ever read inside
+/// `MainActor.assumeIsolated`, on the main queue, which is where the delegate lives.
+private final class WeakDelegate: @unchecked Sendable {
+    weak var value: AppDelegate?
+    init(_ value: AppDelegate) { self.value = value }
 }

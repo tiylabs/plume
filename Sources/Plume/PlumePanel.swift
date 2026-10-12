@@ -210,9 +210,44 @@ final class PlumePanel: NSPanel {
     /// `isFloatingPanel` owns the level — setting `level` alone leaves it back at `.floating` — so
     /// the two always move together.
     private func applyLevel() {
-        let floating = keepsOnTop && !steppedAside
+        let floating = (keepsOnTop || raisedWhileFocused) && !steppedAside
         isFloatingPanel = floating
         level = floating ? .floating : .normal
+    }
+
+    /// Held from the moment the panel is summoned until it loses key status.
+    ///
+    /// **Why a level change and not a better `order` call.** Measured, with a plain foreground app
+    /// whose window overlaps the panel: at `.normal` the panel is ordered front, reports
+    /// `isKeyWindow` and `isVisible`, and then — within 20 to 50 ms — the window server settles it
+    /// *behind* the frontmost app's window, because Plume never activates and that app does. It is
+    /// the app's window that wins the tie at the same level, so `orderFrontRegardless` repeated
+    /// every 30 ms for a second changed nothing. Nothing moved the panel; it was covered.
+    ///
+    /// Where the other app's window does not overlap the panel the tie never matters, which is why
+    /// this only ever showed over a window sharing the panel's area.
+    ///
+    /// So the panel sits one level up for as long as it is the thing being typed into, and drops back
+    /// to `.normal` when it resigns key — which is exactly the `keepOnTop == false` promise, "it
+    /// comes forward when summoned and then goes behind whatever you click next".
+    private var raisedWhileFocused = false {
+        didSet { if raisedWhileFocused != oldValue { applyLevel() } }
+    }
+
+    /// Brings the panel in front of everything, including a window of the app that is frontmost.
+    /// The one place that orders the panel front, so every route in agrees on how.
+    func bringToFront() {
+        raisedWhileFocused = true
+        makeKeyAndOrderFront(nil)
+        // `orderFrontRegardless` is the one that crosses a Space boundary without activating the
+        // app. `makeKeyAndOrderFront` alone gives the panel key status on the Space it is already on.
+        orderFrontRegardless()
+    }
+
+    override func resignKey() {
+        super.resignKey()
+        // Not while parked: a dismissed panel is offscreen and its level is nobody's business.
+        raisedWhileFocused = false
     }
 
     func applyCollectionBehaviour() {
@@ -246,10 +281,7 @@ final class PlumePanel: NSPanel {
         // and belongs to it from then on (180). Only a window ordered in again is placed afresh.
         if !showsOnEverySpace && !isOnActiveSpace { orderOut(nil) }
 
-        makeKeyAndOrderFront(nil)
-        // `orderFrontRegardless` is the one that crosses a Space boundary without activating the
-        // app. `makeKeyAndOrderFront` alone gives the panel key status on the Space it is already on.
-        orderFrontRegardless()
+        bringToFront()
     }
 
     /// Parks the panel before it has ever been summoned.
@@ -273,6 +305,7 @@ final class PlumePanel: NSPanel {
         let was = frame
         guard !parked else { return onscreenFrame }
         parked = true
+        raisedWhileFocused = false
         onscreenFrame = was
         setFrameOrigin(Self.offscreenOrigin)
         return was

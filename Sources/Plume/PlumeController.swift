@@ -287,10 +287,9 @@ final class PlumeController: NSObject {
     /// The caret back in a panel that is already up, without starting a new sitting: undo history and
     /// the unsettled name (103) carry on, which a dismiss and a summon would both reset.
     private func refocus() {
-        panel.makeKeyAndOrderFront(nil)
         // Above another app's floating window at the same level, which ordering alone does not do
         // for a non-activating panel.
-        panel.orderFrontRegardless()
+        panel.bringToFront()
         editor.focusEditor()
     }
 
@@ -345,7 +344,7 @@ final class PlumeController: NSObject {
         // Idempotent on the hotkey path, which never had the problem.
         DispatchQueue.main.async { [weak self] in
             guard let self, self.panel.isSummoned else { return }
-            self.panel.makeKeyAndOrderFront(nil)
+            self.panel.bringToFront()
             self.editor.focusEditor()
         }
 
