@@ -91,10 +91,10 @@ function send(message: OutboundMessage): void {
 // Editor
 // ---------------------------------------------------------------------------------------------
 
-const plumeEl = document.getElementById("plume") as HTMLElement;
+const panelEl = document.getElementById("plume") as HTMLElement;
 const titleBarEl = document.getElementById("titlebar") as HTMLElement;
 const closeEl = document.getElementById("close") as HTMLElement;
-const plumeTitleEl = document.getElementById("plume-title") as HTMLElement;
+const panelTitleEl = document.getElementById("plume-title") as HTMLElement;
 const wordCountEl = document.getElementById("word-count") as HTMLElement;
 const editorHost = document.getElementById("editor-host") as HTMLElement;
 const toastEl = document.getElementById("toast") as HTMLElement;
@@ -135,7 +135,7 @@ function showTitle(lines: Iterable<string>): void {
   // "Untitled" rather than nothing, which is what an empty note showed until ⌘N stopped writing a
   // file the moment it was pressed. A panel with no title and no text reads as broken; the reference
   // names it, and the switcher already calls a nameless note Untitled, so this is the two agreeing.
-  plumeTitleEl.textContent = noteTitle(lines) || t("editor.untitled");
+  panelTitleEl.textContent = noteTitle(lines) || t("editor.untitled");
 }
 
 /** The footer's number, and which one: a press swaps it, and it carries no bubble — a number in
@@ -188,7 +188,7 @@ function reportContentHeight(): void {
   // Whichever of the three rows is laid out, found by measuring: with ⌘F open both the footer and
   // the format bar are hidden, and reading an attribute measured a `display: none` row as 0 (decision 66).
   const bar = [".find", ".format-bar", ".plume__footer"]
-    .map((selector) => plumeEl.querySelector<HTMLElement>(selector))
+    .map((selector) => panelEl.querySelector<HTMLElement>(selector))
     .find((element) => (element?.offsetHeight ?? 0) > 0);
   const chrome = titleBarEl.offsetHeight + (bar?.offsetHeight ?? 0) + bannerEl.offsetHeight;
 
@@ -571,7 +571,7 @@ const actionHandlers: Record<string, () => boolean> = {
   renameFile: () => (send({ type: "renameFile" }), true),
 };
 
-function plumeShortcuts(bindings: Record<string, string>): Extension {
+function panelShortcuts(bindings: Record<string, string>): Extension {
   const run: Record<string, () => boolean> = { ...actionHandlers, actionPanel: () => (toggleActions(), true) };
 
   return keymap.of(
@@ -683,7 +683,7 @@ function baseExtensions(): Extension[] {
     // Plume's own shortcuts, in their own compartment so the Shortcuts tab can rebind them without
     // rebuilding the editor. Listed before the keymap below so they win over CodeMirror's defaults —
     // within one precedence level, the earlier extension is the higher one.
-    shortcutsCompartment.of(plumeShortcuts(DEFAULT_SHORTCUTS)),
+    shortcutsCompartment.of(panelShortcuts(DEFAULT_SHORTCUTS)),
 
     keymap.of([
       // Tier 2: the markdown formatting keys, fixed rather than rebindable (see the note on
@@ -740,7 +740,7 @@ function toggleFormatBar(): void {
   // One footer row, never two (decision 22). Find and the format bar are both that row, so opening
   // either has to put the other away.
   find?.close();
-  plumeEl.toggleAttribute("data-format-bar");
+  panelEl.toggleAttribute("data-format-bar");
   formatBar?.refresh();
   // The bar and the footer are different heights, so swapping them changes how much room the note
   // has — and the window has to follow.
@@ -778,7 +778,7 @@ document.getElementById("open-actions")!.addEventListener("click", () => toggleA
 
 /* Every button names itself the same way: one string carries the shortcut and becomes the accessible
  * name, so a key cannot be advertised differently in two places (decision 58). */
-mountTooltips(plumeEl);
+mountTooltips(panelEl);
 
 /** The chrome's tooltips read the binding in force, re-read whenever settings arrive — decision 68's
  * rule, its fourth instance (92). */
@@ -802,7 +802,7 @@ function refreshChromeTooltips(): void {
     if (!element) continue;
     // The thumbtack names the thing it will do, so its text follows the state.
     const label = t(
-      selector === "#keep-on-top" && plumeEl.hasAttribute("data-keep-on-top")
+      selector === "#keep-on-top" && panelEl.hasAttribute("data-keep-on-top")
         ? "editor.tip.keepOnTop.on"
         : labelKey
     );
@@ -823,7 +823,7 @@ formatBar = mountFormatBar(
 
 find = mountFind({
   root: document.getElementById("find") as HTMLElement,
-  plume: plumeEl,
+  panel: panelEl,
   view,
   onLayoutChange: () => {
     scheduleContentHeight();
@@ -847,8 +847,8 @@ const switcherEl = document.getElementById("switcher") as HTMLElement;
  * panel's height changes after Swift grows the window (decision 45). One `ResizeObserver`, and `top`
  * changes no size, so it cannot feed itself. */
 function placeOverlays(): void {
-  placeOverlay(switcherEl, plumeEl);
-  placeOverlay(actionsEl, plumeEl);
+  placeOverlay(switcherEl, panelEl);
+  placeOverlay(actionsEl, panelEl);
 }
 
 new ResizeObserver(placeOverlays).observe(switcherEl);
@@ -856,8 +856,8 @@ new ResizeObserver(placeOverlays).observe(actionsEl);
 
 const actions = mountActionPanel({
   root: actionsEl,
-  plume: plumeEl,
-  isPinned: () => plumeEl.hasAttribute("data-pinned"),
+  panel: panelEl,
+  isPinned: () => panelEl.hasAttribute("data-pinned"),
   isHiddenFromCapture: () => hiddenFromCapture,
   isAutoSizing: () => autoSizing,
   spaceAssignment: () => spaceAssignment,
@@ -877,7 +877,7 @@ const actions = mountActionPanel({
 
 const switcher = mountSwitcher({
   root: switcherEl,
-  plume: plumeEl,
+  panel: panelEl,
   onQuery: (query) => send({ type: "requestNotes", query }),
   onOpen: (filename) => send({ type: "openNote", filename }),
   onCreate: (title) => send({ type: "createNote", title }),
@@ -1030,7 +1030,7 @@ const host = {
       applyingRemoteEdit = false;
     }
 
-    plumeEl.toggleAttribute("data-pinned", pinned);
+    panelEl.toggleAttribute("data-pinned", pinned);
     document.getElementById("pin")!.setAttribute("aria-pressed", String(pinned));
     showTitle(text.split("\n"));
     renderCount(text);
@@ -1061,7 +1061,7 @@ const host = {
   },
 
   setPinned(pinned: boolean): void {
-    plumeEl.toggleAttribute("data-pinned", pinned);
+    panelEl.toggleAttribute("data-pinned", pinned);
     document.getElementById("pin")!.setAttribute("aria-pressed", String(pinned));
   },
 
@@ -1069,7 +1069,7 @@ const host = {
     // Kept for anything that genuinely cares about key state. It no longer drives the chrome —
     // decision 41 moved that to the cursor — and so it no longer changes the title bar's layout,
     // which is why the drag regions do not need re-reporting here any more.
-    plumeEl.toggleAttribute("data-focused", focused);
+    panelEl.toggleAttribute("data-focused", focused);
   },
 
   /** Appearance, accent, theme and key bindings. The CSS keys off these attributes and variables. */
@@ -1131,7 +1131,7 @@ const host = {
     if (settings.shortcuts) {
       liveShortcuts = { ...DEFAULT_SHORTCUTS, ...settings.shortcuts };
       view.dispatch({
-        effects: shortcutsCompartment.reconfigure(plumeShortcuts(settings.shortcuts)),
+        effects: shortcutsCompartment.reconfigure(panelShortcuts(settings.shortcuts)),
       });
       // The chrome's bubbles print keys too, and a rebind has to reach them or a button goes on
       // advertising a key that now does something else — decision 17's rule, in its fourth place.
@@ -1153,7 +1153,7 @@ const host = {
   },
 
   setKeepOnTop(on: boolean): void {
-    plumeEl.toggleAttribute("data-keep-on-top", on);
+    panelEl.toggleAttribute("data-keep-on-top", on);
     document.getElementById("keep-on-top")!.setAttribute("aria-pressed", String(on));
     refreshChromeTooltips();
   },
@@ -1176,14 +1176,14 @@ const host = {
   /** The close dot alone, from the same read as `setHover`: `:hover` cannot, because the page gets no
    * mouse events with the panel over another app (decision 107). */
   setCloseHover(inside: boolean): void {
-    plumeEl.toggleAttribute("data-close-hover", inside);
+    panelEl.toggleAttribute("data-close-hover", inside);
   },
 
   setHover(inside: boolean): void {
-    plumeEl.toggleAttribute("data-hover", inside);
+    panelEl.toggleAttribute("data-hover", inside);
     // The dot cannot be hovered when the panel is not: both come from one pointer read, and leaving
     // the panel behind a stale `data-close-hover` would strand a lit dot on a dimmed bar.
-    if (!inside) plumeEl.removeAttribute("data-close-hover");
+    if (!inside) panelEl.removeAttribute("data-close-hover");
     // The pointer can leave a *window* without the page seeing a leave event, and the chrome it was
     // over is about to fade out from under any tooltip naming it.
     if (!inside) hideTooltip();
@@ -1279,13 +1279,13 @@ bannerEl.addEventListener("click", () => host.hideBanner());
 new ResizeObserver(() => {
   reportDragRegions();
   placeOverlays();
-}).observe(plumeEl);
+}).observe(panelEl);
 
 /* The pin enters and leaves the title bar with the panel's pinned state (decision 54), which moves
  * the buttons beside it — and the drag-exclusion rects Swift hit-tests are measured from those
  * boxes. This is the same hook the title's old scroll-gated reveal needed, pointed at the one
  * attribute that still changes the bar's layout. */
-new MutationObserver(reportDragRegions).observe(plumeEl, {
+new MutationObserver(reportDragRegions).observe(panelEl, {
   attributes: true,
   attributeFilter: ["data-pinned", "data-keep-on-top"],
 });

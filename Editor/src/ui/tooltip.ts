@@ -31,7 +31,7 @@
 const SHOW_DELAY_MS = 800;
 
 let tip: HTMLElement | null = null;
-let plume: HTMLElement | null = null;
+let panel: HTMLElement | null = null;
 /** Whose name is on screen, so a pointer that never crosses back out can still be noticed. */
 let named: HTMLElement | null = null;
 
@@ -90,12 +90,12 @@ function escapeHtml(text: string): string {
   );
 }
 
-export function mountTooltips(plumeEl: HTMLElement): void {
-  plume = plumeEl;
+export function mountTooltips(panelEl: HTMLElement): void {
+  panel = panelEl;
   tip = document.createElement("div");
   tip.className = "plume__tip";
   tip.hidden = true;
-  plumeEl.appendChild(tip);
+  panelEl.appendChild(tip);
 
   /*
    * `mouseleave` is not enough to take a tooltip down, and the bubble that will not go away is far
@@ -135,7 +135,7 @@ export function mountTooltips(plumeEl: HTMLElement): void {
   });
 
   document.addEventListener("keydown", hideTooltip, true);
-  plumeEl.addEventListener("mouseleave", hideTooltip);
+  panelEl.addEventListener("mouseleave", hideTooltip);
   // The pointer leaving the document — which in a WKWebView means leaving the window — arrives as a
   // mouseout with nothing to enter, and as a window blur when it lands in another app.
   document.addEventListener("mouseout", (event) => {
@@ -229,24 +229,24 @@ export function hideTooltip(): void {
 
 /** Puts the bubble over one control. Shared by `describe` and the `data-tip` delegation above. */
 function showFor(button: HTMLElement, text: string): void {
-  if (!tip || !plume || !text) return;
+  if (!tip || !panel || !text) return;
   named = button;
   const { name, keys } = parse(text);
   tip.innerHTML = keys ? `${escapeHtml(name)}<kbd>${escapeHtml(keys)}</kbd>` : escapeHtml(name);
   tip.hidden = false;
 
-  const plumeBox = plume.getBoundingClientRect();
+  const panelBox = panel.getBoundingClientRect();
   const box = button.getBoundingClientRect();
   // Below a control in the top half of the panel, above one in the bottom half — so the bubble
   // never covers the thing it is naming, wherever that thing lives.
-  const below = box.top - plumeBox.top < plumeBox.height / 2;
+  const below = box.top - panelBox.top < panelBox.height / 2;
   tip.style.top = below
-    ? `${box.bottom - plumeBox.top + 6}px`
-    : `${box.top - plumeBox.top - tip.offsetHeight - 6}px`;
+    ? `${box.bottom - panelBox.top + 6}px`
+    : `${box.top - panelBox.top - tip.offsetHeight - 6}px`;
 
   const half = tip.offsetWidth / 2;
-  const centre = box.left - plumeBox.left + box.width / 2;
-  tip.style.left = `${Math.min(Math.max(centre, half + 8), plumeBox.width - half - 8)}px`;
+  const centre = box.left - panelBox.left + box.width / 2;
+  tip.style.left = `${Math.min(Math.max(centre, half + 8), panelBox.width - half - 8)}px`;
 }
 
 /**

@@ -97,14 +97,14 @@ function matchesOf(text: string, query: string): Match[] {
 
 interface FindOptions {
   root: HTMLElement;
-  plume: HTMLElement;
+  panel: HTMLElement;
   view: EditorView;
   /** The bar and the footer are different heights, so the window has to follow. */
   onLayoutChange: () => void;
 }
 
 export function mountFind(options: FindOptions) {
-  const { root, plume, view } = options;
+  const { root, panel, view } = options;
 
   root.innerHTML = `
     <div class="find__row">
@@ -171,7 +171,7 @@ export function mountFind(options: FindOptions) {
   const count = root.querySelector<HTMLElement>(".find__count")!;
 
   function isOpen(): boolean {
-    return plume.hasAttribute("data-find");
+    return panel.hasAttribute("data-find");
   }
 
   function state(): FindState | null {
@@ -295,9 +295,9 @@ export function mountFind(options: FindOptions) {
       input.focus();
       return;
     }
-    plume.setAttribute("data-find", "");
+    panel.setAttribute("data-find", "");
     // The format bar and this one are both the footer row; two of them would stack.
-    plume.removeAttribute("data-format-bar");
+    panel.removeAttribute("data-format-bar");
     options.onLayoutChange();
 
     // Whatever is selected is almost always what you were about to type.
@@ -314,7 +314,7 @@ export function mountFind(options: FindOptions) {
 
   function close(): void {
     if (!isOpen()) return;
-    plume.removeAttribute("data-find");
+    panel.removeAttribute("data-find");
     // The disclosure closes with the bar. Reopening find to a replace row you opened an hour ago
     // is a taller bar than you asked for.
     root.removeAttribute("data-replace");

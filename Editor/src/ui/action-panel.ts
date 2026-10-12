@@ -41,7 +41,7 @@ export interface ActionRow {
 
 interface ActionPanelOptions {
   root: HTMLElement;
-  plume: HTMLElement;
+  panel: HTMLElement;
   /** Whether the current panel is pinned, so the Pin row can say which way it goes. */
   isPinned: () => boolean;
   /** Same, for the capture toggle. */
@@ -187,7 +187,7 @@ const GROUPS: ActionRow[][] = [
 ];
 
 export function mountActionPanel(options: ActionPanelOptions) {
-  const { root, plume } = options;
+  const { root, panel } = options;
   const search = root.querySelector<HTMLInputElement>(".actions__search")!;
   const list = root.querySelector<HTMLElement>(".actions__list")!;
 
@@ -197,7 +197,7 @@ export function mountActionPanel(options: ActionPanelOptions) {
   let expanded = false;
 
   function isOpen(): boolean {
-    return plume.hasAttribute("data-actions");
+    return panel.hasAttribute("data-actions");
   }
 
   /** See `desiredOverlayHeight` — shared with the switcher, which used to be a constant in Swift. */
@@ -208,7 +208,7 @@ export function mountActionPanel(options: ActionPanelOptions) {
   /** @param unfoldSpace open on Assign to Desktop's choices, the one in force selected — ⌥⌘S. */
   function open(unfoldSpace = false): void {
     if (isOpen()) return;
-    plume.setAttribute("data-actions", "");
+    panel.setAttribute("data-actions", "");
     search.value = "";
     expanded = unfoldSpace;
     selected = 0;
@@ -227,7 +227,7 @@ export function mountActionPanel(options: ActionPanelOptions) {
 
   function close(): void {
     if (!isOpen()) return;
-    plume.removeAttribute("data-actions");
+    panel.removeAttribute("data-actions");
     options.onVisibilityChange(false, 0);
   }
 

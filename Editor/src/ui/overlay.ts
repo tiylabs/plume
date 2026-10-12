@@ -52,16 +52,16 @@ const TOP_RATIO = 0.15;
  * used to work out how tall to grow. So the panel never asks for a position the panel cannot honour,
  * and the two never argue.
  */
-export function overlayTop(plumeHeight: number, panelHeight: number): number {
-  const lowestThatFits = Math.max(OVERLAY_TOP_MIN, plumeHeight - panelHeight - OVERLAY_GAP_BOTTOM);
-  return Math.round(Math.min(Math.max(OVERLAY_TOP_MIN, plumeHeight * TOP_RATIO), lowestThatFits));
+export function overlayTop(panelHeight: number, overlayHeight: number): number {
+  const lowestThatFits = Math.max(OVERLAY_TOP_MIN, panelHeight - overlayHeight - OVERLAY_GAP_BOTTOM);
+  return Math.round(Math.min(Math.max(OVERLAY_TOP_MIN, panelHeight * TOP_RATIO), lowestThatFits));
 }
 
-/** Places one overlay, if it is on screen. A hidden panel has no height and nothing to place. */
-export function placeOverlay(panel: HTMLElement, plume: HTMLElement): void {
-  const height = panel.offsetHeight;
+/** Places one overlay, if it is on screen. A hidden overlay has no height and nothing to place. */
+export function placeOverlay(overlay: HTMLElement, panel: HTMLElement): void {
+  const height = overlay.offsetHeight;
   if (height === 0) return;
-  panel.style.top = `${overlayTop(plume.clientHeight, height)}px`;
+  overlay.style.top = `${overlayTop(panel.clientHeight, height)}px`;
 }
 
 /**

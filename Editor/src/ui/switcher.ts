@@ -25,7 +25,7 @@ export interface NoteSummary {
 
 interface SwitcherOptions {
   root: HTMLElement;
-  plume: HTMLElement;
+  panel: HTMLElement;
   onQuery: (query: string) => void;
   onOpen: (filename: string) => void;
   onCreate: (title: string) => void;
@@ -58,7 +58,7 @@ const TRASH_SVG = `<svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="
 const PIN_OUTLINE_SVG = `<svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="5" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="7" y1="8" x2="7" y2="13" stroke="currentColor" stroke-width="1.5"/></svg>`;
 
 export function mountSwitcher(options: SwitcherOptions) {
-  const { root, plume } = options;
+  const { root, panel } = options;
   const search = root.querySelector<HTMLInputElement>(".switcher__search")!;
   const list = root.querySelector<HTMLElement>(".switcher__list")!;
   const footer = root.querySelector<HTMLElement>(".switcher__footer")!;
@@ -73,11 +73,11 @@ export function mountSwitcher(options: SwitcherOptions) {
   let heightReported = false;
 
   function isOpen(): boolean {
-    return plume.hasAttribute("data-switcher");
+    return panel.hasAttribute("data-switcher");
   }
 
   function show(): void {
-    plume.setAttribute("data-switcher", "");
+    panel.setAttribute("data-switcher", "");
     search.value = "";
     query = "";
     selected = 0;
@@ -92,7 +92,7 @@ export function mountSwitcher(options: SwitcherOptions) {
    * Tells Swift how tall a panel this list wants — **once per opening**, at the first render.
    *
    * Swift used to work this out from a constant: `54 + 430 + 34` handed to
-   * `plumeHeight(forOverlay:)`, which adds the 54 again. So ⌘P grew the panel to 691pt whatever was
+   * `panelHeight(forOverlay:)`, which adds the 54 again. So ⌘P grew the panel to 691pt whatever was
    * in it, and a six-note vault got a 370pt panel floating in the middle of it.
    *
    * Once, rather than on every keystroke: this list can go from 200 notes to three as you type, and
@@ -133,7 +133,7 @@ export function mountSwitcher(options: SwitcherOptions) {
 
   function close(): void {
     if (!isOpen()) return;
-    plume.removeAttribute("data-switcher");
+    panel.removeAttribute("data-switcher");
     options.onVisibilityChange(false, 0);
   }
 
