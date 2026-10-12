@@ -8,7 +8,7 @@ swift Scripts/dev-app.swift --test
 python3 - "$ROOT" <<'PY'
 import pathlib, plistlib, sys
 root = pathlib.Path(sys.argv[1])
-source = plistlib.loads((root / 'Scripts/Info.plist').read_bytes())
+source = plistlib.loads((root / 'App/Info.plist').read_bytes())
 release_path = root / 'build/Plume.app'
 dev_path = root / 'build/Plume Dev.app'
 release = plistlib.loads((release_path / 'Contents/Info.plist').read_bytes())
@@ -25,9 +25,9 @@ assert dev['CFBundleExecutable'] == release['CFBundleExecutable'] == 'Plume'
 for app in (release_path, dev_path):
     assert (app / 'Contents/MacOS/Plume').is_file()
     assert (app / 'Contents/Resources/Editor/index.html').is_file()
-assert (release_path / 'Contents/Resources/AppIcon.icns').read_bytes() == (root / 'Scripts/AppIcon.icns').read_bytes()
-assert (dev_path / 'Contents/Resources/AppIcon.icns').read_bytes() == (root / 'Scripts/AppIcon-dev.icns').read_bytes()
-assert (root / 'Scripts/AppIcon.icns').read_bytes() != (root / 'Scripts/AppIcon-dev.icns').read_bytes()
+assert (release_path / 'Contents/Resources/AppIcon.icns').read_bytes() == (root / 'App/AppIcon.icns').read_bytes()
+assert (dev_path / 'Contents/Resources/AppIcon.icns').read_bytes() == (root / 'App/AppIcon-dev.icns').read_bytes()
+assert (root / 'App/AppIcon.icns').read_bytes() != (root / 'App/AppIcon-dev.icns').read_bytes()
 print('✓ release metadata/resources unchanged; development identity and icon are separate')
 PY
 

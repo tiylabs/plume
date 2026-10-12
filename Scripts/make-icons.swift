@@ -9,8 +9,8 @@
 // Run it by hand when the artwork changes; the outputs are committed, so a plain checkout builds
 // without needing to regenerate anything. `Scripts/build-app.sh` picks both of them up on its own.
 //
-//   Design/AppIcon.png       square PNG      ->  Scripts/AppIcon.icns
-//   Design/MenuBarIcon.png   monochrome PNG  ->  Resources/MenuBar{,@2x,@3x}.png
+//   Design/AppIcon.png       square PNG      ->  App/AppIcon.icns
+//   Design/MenuBarIcon.png   monochrome PNG  ->  App/Resources/MenuBar{,@2x,@3x}.png
 //
 // The app export already includes the intended transparent margin: keep its entire canvas and
 // alpha unchanged, and only resample for smaller icon representations. The menu-bar export is
@@ -245,8 +245,8 @@ let root = URL(fileURLWithPath: CommandLine.arguments.first.map {
 } ?? FileManager.default.currentDirectoryPath)
 
 let design = root.appendingPathComponent("Design")
-let scripts = root.appendingPathComponent("Scripts")
-let resources = root.appendingPathComponent("Resources")
+let appFolder = root.appendingPathComponent("App")
+let resources = appFolder.appendingPathComponent("Resources")
 let arguments = Array(CommandLine.arguments.dropFirst())
 guard arguments.isEmpty || arguments == ["--app-only"] || arguments == ["--menu-only"] else {
     fail("usage: Scripts/make-icons.swift [--app-only|--menu-only]")
@@ -265,7 +265,7 @@ if arguments != ["--menu-only"] {
     guard master.width == master.height else { fail("AppIcon.png must have a square canvas") }
     print("    preserved full \(master.width)×\(master.height) canvas and original alpha")
 
-    let iconset = scripts.appendingPathComponent("AppIcon.iconset")
+    let iconset = appFolder.appendingPathComponent("AppIcon.iconset")
     try? FileManager.default.removeItem(at: iconset)
     try! FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
 
@@ -282,7 +282,7 @@ if arguments != ["--menu-only"] {
         }
     }
 
-    let icns = scripts.appendingPathComponent("AppIcon.icns")
+    let icns = appFolder.appendingPathComponent("AppIcon.icns")
     let iconutil = Process()
     iconutil.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
     iconutil.arguments = ["-c", "icns", iconset.path, "-o", icns.path]
@@ -292,7 +292,7 @@ if arguments != ["--menu-only"] {
 
     // The .iconset is an intermediate; the .icns is the artefact worth committing.
     try? FileManager.default.removeItem(at: iconset)
-    print("    wrote Scripts/AppIcon.icns")
+    print("    wrote App/AppIcon.icns")
 }
 
 // ---- menu bar icon ----------------------------------------------------------------------------
@@ -319,4 +319,4 @@ for scale in 1...3 {
         to: resources.appendingPathComponent("MenuBar\(suffix).png")
     )
 }
-print("    wrote Resources/MenuBar{,@2x,@3x}.png")
+print("    wrote App/Resources/MenuBar{,@2x,@3x}.png")

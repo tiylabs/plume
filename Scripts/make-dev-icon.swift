@@ -4,8 +4,8 @@ import Foundation
 
 // Derive only the dev asset; regenerating it must never rewrite the shipped artwork.
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-guard let source = NSImage(contentsOf: root.appendingPathComponent("Scripts/AppIcon.icns")) else {
-    fatalError("could not read Scripts/AppIcon.icns")
+guard let source = NSImage(contentsOf: root.appendingPathComponent("App/AppIcon.icns")) else {
+    fatalError("could not read App/AppIcon.icns")
 }
 let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
 let iconset = temporary.appendingPathComponent("AppIcon.iconset")
@@ -56,8 +56,8 @@ for (points, scale) in [(16, 1), (16, 2), (32, 1), (32, 2), (128, 1), (128, 2),
 let process = Process()
 process.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
 process.arguments = ["-c", "icns", iconset.path, "-o",
-                     root.appendingPathComponent("Scripts/AppIcon-dev.icns").path]
+                     root.appendingPathComponent("App/AppIcon-dev.icns").path]
 try process.run()
 process.waitUntilExit()
 guard process.terminationStatus == 0 else { exit(process.terminationStatus) }
-print("Generated Scripts/AppIcon-dev.icns (release icon unchanged)")
+print("Generated App/AppIcon-dev.icns (release icon unchanged)")
