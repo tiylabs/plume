@@ -5,7 +5,7 @@
  * to read it as prose. Tighter than the default on every axis: type, leading, the gap between
  * blocks, and the step between list levels.
  *
- * A theme is a CSS file in this folder (decision 19) — copy it, rename it, edit it. Like the other
+ * A theme is a CSS file in this folder — copy it, rename it, edit it. Like the other
  * preset, this one is scoped to the editor and never touches `:root`, so the chrome around the note
  * stays exactly as it is: a theme restyles the writing, not the application.
  */

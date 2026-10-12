@@ -69,34 +69,32 @@ public struct Settings: Codable, Equatable, Sendable {
     /// kept on load so a newer Plume's settings file survives a downgrade.
     public var shortcuts: [String: String]
 
-    /// Action key, the label the tab shows, and the binding Plume ships with.
+    /// The rebindable in-panel shortcuts: action key, the binding Plume ships with, and the group
+    /// heading the row sits under.
     ///
-    /// Deliberately only the actions that exist — decision 31. Of frame 3c's eight rows the only one
-    /// still absent is Open in New Panel, which belongs to multi-panel (decision 18); a recordable row
-    /// that binds nothing is worse than an absent one. Adding one back is one entry here, which is
-    /// exactly what happened to Action Panel when ⌘K landed, and to Find in Note with decision 38.
+    /// Listed in the order the Shortcuts tab shows them, which is ⌘K's order, grouped the way ⌘K
+    /// groups them. One list of rows sorted by nothing in particular is hard to look anything up in,
+    /// and the panel had already settled what belongs beside what.
     ///
+    /// **Only the actions that exist.** The one row still absent is Open in New Panel, which belongs
+    /// to multi-panel; a recordable row that binds nothing is worse than an absent one. Adding one
+    /// back is one entry here, which is what happened when the action panel and Find in Note landed.
     /// Most of these are also ⌘K rows, so the shortcut printed beside a row and the shortcut in this
     /// table are the same binding rather than two things that have to be kept in step.
-    /// The rebindable in-panel shortcuts (design frame 3c).
-    ///
-    /// **These defaults are habit-compatible with Raycast Notes and that is deliberate** (decision
-    /// 39). Raycast Notes is what Plume was built against and what its user is leaving, so every
-    /// action both apps have carries the same key — checked row by row against Raycast's own ⌘K
-    /// panel. Plume's extra rows sit on chords Raycast leaves free.
-    ///
-    /// So treat this table as frozen. A key here that reads better in isolation still costs a
-    /// switcher their muscle memory, and a shortcut some *other* app has claimed system-wide is what
-    /// the recorder is for (decision 15) — not a reason to move the shipped default.
-    /// Every rebindable action, in the order the Shortcuts tab lists them — which is ⌘K's order,
-    /// grouped the way ⌘K groups them. One list of sixteen rows sorted by nothing in particular is
-    /// hard to look anything up in, and the panel had already settled what belongs beside what.
-    /// The rows the Shortcuts tab offers a recorder for.
     ///
     /// **Not every shortcut Plume has** — see `fixedShortcuts` for the rest, and the note there for
     /// where the line falls. This table is "what you might plausibly want to change", which is a
     /// different question from "what keys exist", and conflating the two is what took the tab to
     /// sixteen rows in one column.
+    ///
+    /// **These defaults are habit-compatible with Raycast Notes, and that is deliberate.** Raycast
+    /// Notes is what Plume was built against and what its user is leaving, so every action both apps
+    /// have carries the same key — checked row by row against Raycast's own ⌘K panel. Plume's extra
+    /// rows sit on chords Raycast leaves free.
+    ///
+    /// So treat this table as frozen. A key here that reads better in isolation still costs a
+    /// switcher their muscle memory, and a shortcut some *other* app has claimed system-wide is what
+    /// the recorder is for — not a reason to move the shipped default.
     ///
     /// **`group` is a catalog key suffix, `label` is `shortcut.<key>`.** Names are looked up when the
     /// tab is drawn (`label(of:)`, `groupName(_:)`), not stored here, so switching language

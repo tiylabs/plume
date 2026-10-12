@@ -1212,10 +1212,6 @@ const host = {
     setHeading(view, level);
   },
 
-  /**
-   * The one-line status row: a conflict sibling was written, a note is downloading, or something
-   * failed. Never steals the caret and never blocks typing (decision 8).
-   */
   /** A transient confirmation. Out of layout, so it never disturbs the reported height. */
   showToast(text: string, dwell?: number): void {
     toastEl.textContent = text;
@@ -1232,6 +1228,10 @@ const host = {
     }, dwell ?? 1900);
   },
 
+  /**
+   * The one-line status row: a conflict sibling was written, a note is downloading, or something
+   * failed. Never steals the caret and never blocks typing.
+   */
   showBanner(kind: string, text: string): void {
     bannerEl.setAttribute("data-kind", kind);
     bannerTextEl.textContent = text;

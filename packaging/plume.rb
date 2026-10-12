@@ -23,7 +23,7 @@ cask "plume" do
   app "Plume.app"
 
   # Enumerated rather than trashing the whole support directory, because it is no longer only the
-  # app's own leavings. Decision 35 put "Recently Deleted" in there — up to 30 days of notes the user
+  # app's own leavings. "Recently Deleted" lives in there — up to 30 days of notes the user
   # deleted and can still get back — so `--zap` would have swept away recoverable documents as a side
   # effect of uninstalling. Anything added here later has to answer the same question: is it Plume's,
   # or is it the user's?
