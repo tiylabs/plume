@@ -16,7 +16,8 @@ Design/
 └── Notes/
     ├── dock-space-detection.md   how the Dock's "Assign To" setting is read
     ├── naming-conventions.md     how code is named and laid out, and the names that must not change
-    └── architecture-refactor-plan.md   the phased plan for restructuring the code, with acceptance criteria
+    ├── architecture-refactor-plan.md   the phased plan for restructuring the code, with acceptance criteria
+    └── agent-integration-plan.md   local MCP/CLI access, writing context, and coordinated note creation and modification
 ```
 
 ## Which exploration became the final
