@@ -22,6 +22,7 @@
  * of those is what runs.
  */
 
+import type { DockSpaceAssignmentState, SpaceAssignmentState } from "../bridge/protocol";
 import { icon } from "./format-bar";
 import { desiredOverlayHeight, pointerMotion } from "./overlay";
 import { t } from "../i18n";
@@ -57,22 +58,6 @@ interface ActionPanelOptions {
   /** The key caps to print for a row, from the bindings in force. Null keeps the row's own. */
   keysFor: (id: string) => string[] | null;
   onVisibilityChange: (open: boolean, height: number) => void;
-}
-
-/** The panel's Space assignment, from Swift — the page cannot see Spaces. */
-export interface SpaceAssignmentState {
-  /** `Settings.SpaceAssignment`'s raw value: `unassigned`, `oneSpace` or `everySpace`. */
-  mode: string;
-  /** The desktop This Desktop names: the one kept to, or the one it would keep to if chosen now. */
-  desktop: number | null;
-  /** Whether Swift can tell desktops apart at all. Without it there is no This Desktop to offer. */
-  canKeepToOne: boolean;
-}
-
-/** The system observation takes precedence over Plume's saved assignment. */
-export interface DockSpaceAssignmentState {
-  mode: "checking" | "unknown" | "unassigned" | "oneSpace" | "everySpace";
-  desktop: number | null;
 }
 
 /** The row that unfolds, and what unfolds under it — in the Dock's order. */

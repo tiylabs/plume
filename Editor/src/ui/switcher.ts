@@ -6,22 +6,9 @@
  * recency bands, the relative-time format) live in Swift where they are unit-tested.
  */
 
+import type { NoteSummary } from "../bridge/protocol";
 import { desiredOverlayHeight, pointerMotion } from "./overlay";
 import { plural, t } from "../i18n";
-
-export interface NoteSummary {
-  filename: string;
-  title: string;
-  /** Preformatted by PlumeKit: "now", "42m", "2h", "Thu", "Jul 30", "May 12, 2025". */
-  time: string;
-  preview: string;
-  /** "Pinned", "Today", "Yesterday", "This week", "July"… Absent when the list is flat. */
-  band?: string;
-  pinned?: boolean;
-  current?: boolean;
-  /** Set when the query matched the body: the snippet replaces the preview, highlighted. */
-  match?: { pre: string; hit: string; post: string };
-}
 
 interface SwitcherOptions {
   root: HTMLElement;

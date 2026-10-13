@@ -41,7 +41,7 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 
-import { mountActionPanel, type SpaceAssignmentState, type DockSpaceAssignmentState } from "./ui/action-panel";
+import { mountActionPanel } from "./ui/action-panel";
 import { placeOverlay } from "./ui/overlay";
 import { describe, hideTooltip, mountTooltips, setPointer } from "./ui/tooltip";
 import { findHighlighting, mountFind } from "./ui/find";
@@ -63,12 +63,12 @@ import { shiftTab, tab } from "./keyboard/tab";
 import { caretBlankLineSlack, livePreview } from "./markdown/live-preview";
 import { renumberOrderedLists } from "./markdown/renumber";
 import { plumeDialect } from "./markdown/dialect";
-import { mountSwitcher, type NoteSummary } from "./ui/switcher";
+import { mountSwitcher } from "./ui/switcher";
 import { MARKDOWN_FORMAT_KEYS, mountFormatBar, setHeading, pendingWrapExtension } from "./ui/format-bar";
 import { noteTitle } from "./markdown/note-title";
 import { countCharacters, countWords } from "./markdown/word-count";
 import { onLanguageChange, plural, setLanguage, t, translateStaticMarkup } from "./i18n";
-import type { OutboundMessage, Rect } from "./bridge/protocol";
+import type { DockSpaceAssignmentState, HostAPI, NoteSummary, OutboundMessage, Rect, SpaceAssignmentState } from "./bridge/protocol";
 
 // ---------------------------------------------------------------------------------------------
 // Bridge
@@ -77,7 +77,7 @@ import type { OutboundMessage, Rect } from "./bridge/protocol";
 declare global {
   interface Window {
     webkit?: { messageHandlers?: { plume?: { postMessage(message: unknown): void } } };
-    plumeHost: typeof host;
+    plumeHost: HostAPI;
   }
 }
 
@@ -998,7 +998,7 @@ document.addEventListener(
 // Inbound — everything Swift can ask the web layer to do
 // ---------------------------------------------------------------------------------------------
 
-const host = {
+const host: HostAPI = {
   /**
    * Loads a note and puts the caret back exactly where it was (decision 11).
    *
@@ -1073,18 +1073,7 @@ const host = {
   },
 
   /** Appearance, accent, theme and key bindings. The CSS keys off these attributes and variables. */
-  applySettings(settings: {
-    appearance?: string;
-    accent?: string;
-    accentDark?: string;
-    textSize?: number;
-    panelOpacity?: number;
-    glass?: boolean;
-    themeCSS?: string;
-    shortcuts?: Record<string, string>;
-    footerCount?: string;
-    language?: string;
-  }): void {
+  applySettings(settings): void {
     // First: the rest of this method re-renders text, and it should come out in the right language.
     if (settings.language) setLanguage(settings.language);
 
