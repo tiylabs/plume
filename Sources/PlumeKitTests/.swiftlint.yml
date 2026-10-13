@@ -1,5 +1,0 @@
-# The suite is a plain executable (see Package.swift): a crash *is* the failure report, so
-# `try!` / `as!` are the intended style here.
-disabled_rules:
-  - force_try
-  - force_cast

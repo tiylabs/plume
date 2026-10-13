@@ -13,7 +13,7 @@
  */
 
 import type { EditorState } from "@codemirror/state";
-import { fencedBlockAt, fencesOf, notAPlace } from "../blocks";
+import { fencedBlockAt, fencesOf, notAPlace } from "../markdown/blocks";
 import type { Command } from "./edit";
 
 /** The closed block whose code line holds `pos`, with its first and last lines. */

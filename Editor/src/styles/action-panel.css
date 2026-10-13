@@ -284,31 +284,28 @@
   opacity: 1;
 }
 
-/* ---- Narrow panels: the label wins ---------------------------------------------------------------
+/* ---- Narrow panels -------------------------------------------------------------------------------
  *
- * **420px is measured, not chosen.** It is the panel width at which the longest row stops fitting
- * beside its chips — and the longest row is *Disable* Window Auto-sizing, three pixels wider than
- * the Enable state you can see in a screenshot. Tuning to the label that happens to be on screen
- * would have left the fault behind the toggle (decision 82's habit, and decision 100's trap).
- *
- * Below it the shortcut goes and the label stays, because the label is what tells you which row
- * this is; the shortcut is a second way to do something you can already do by pressing ⏎ on it.
- * Reported as `Enable Win…`, `Copy as Ma…`, `Keep on Thi…` — six of fifteen rows unreadable at the
- * minimum width, which is a panel that cannot answer the only question it exists to answer.
- *
- * The viewport is the panel: the web view fills the window, so `max-width` here is the panel's own
- * width and needs no plumbing from Swift. **Not a container query** — `container-type: inline-size`
- * would add containment to the element whose height feeds `reportContentHeight`, and that is a risk
- * this does not need to take for a number that is already the right one.
- *
- * `PanelGeometry.minimumWidth` is 340 rather than 320 for this rule's sake: 340 is the narrowest
- * panel at which every row is fully readable *with* the chips gone, so there is no width left where
- * ⌘K prints a label you cannot finish. */
+ * At 420px the longest labels stop fitting beside their shortcut chips. Keep both useful: let the
+ * chips wrap onto a second line, aligned to the right, so the action stays identifiable and its key
+ * remains visible even at the panel's 340px minimum width. The viewport is the panel because the
+ * web view fills the window; this needs no sizing message from Swift or containment on the element
+ * whose height feeds the panel's content measurement.
+ */
 @media (max-width: 419px) {
+  .actions__row {
+    flex-wrap: wrap;
+  }
+
+  .actions__label {
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+  }
+
   .actions__keys {
-    max-width: 0;
-    opacity: 0;
-    margin-left: -10px; /* cancels `.actions__row`'s gap, which a zero-width child still earns */
+    flex-basis: 100%;
+    justify-content: flex-end;
   }
 }
 

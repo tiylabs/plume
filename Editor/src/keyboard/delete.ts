@@ -14,7 +14,7 @@
 
 import type { LineContext } from "./context";
 import { NOOP, rows, type KeyEdit } from "./edit";
-import { fencedBlockAt, fenceOrRuleLine, markerSpanEnd, paragraphBreakLine, ruleLine } from "../blocks";
+import { fencedBlockAt, fenceOrRuleLine, markerSpanEnd, paragraphBreakLine, ruleLine } from "../markdown/blocks";
 
 const DELETE = "delete.forward";
 

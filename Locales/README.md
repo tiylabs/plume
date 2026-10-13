@@ -58,7 +58,7 @@ picks between them:
 - Chinese, Japanese, Korean, Vietnamese, Thai use `other` **only** — supply no `.one`.
 - `other` is required in every language.
 - The editor uses `Intl.PluralRules`, so it needs no code for any language. The Swift side has a
-  small table, `L10n.pluralCategory` in `Sources/PlumeKit/Localization.swift`. **Only a language with
+  small table, `L10n.pluralCategory` in `Sources/PlumeKit/Support/L10n.swift`. **Only a language with
   more than two categories (Russian, Polish, Arabic…) needs a new case there**, plus the extra
   `.few` / `.many` entries in its `strings.json`.
 

@@ -19,7 +19,7 @@
 import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
-import { contentColumn, softBreakOwner } from "../list-indent";
+import { contentColumn, softBreakOwner } from "../markdown/list-indent";
 import { applyEdit, type Command, type KeyEdit } from "./edit";
 
 export interface NeighbourLine {

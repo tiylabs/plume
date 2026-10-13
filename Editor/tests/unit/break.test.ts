@@ -4,7 +4,7 @@
  * rest there. The caret in `doc` marks the line being asked about.
  */
 
-import { paragraphBreakLine } from "../../src/blocks";
+import { paragraphBreakLine } from "../../src/markdown/blocks";
 import { stateFor, type Case } from "./harness";
 
 export const press = (doc: string): string => {

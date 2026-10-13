@@ -1,0 +1,62 @@
+import Foundation
+
+/// The one network call Plume makes, in one place.
+///
+/// It was inline in the About tab while the About button was the only caller. The summon check is
+/// the second caller, and two copies of a request would be two User-Agent strings, two timeouts and
+/// two ways to parse the same JSON — the shape of fault decision 74 keeps finding, one file over.
+///
+/// What it does **not** do is unchanged from decision 94, and the list is the promise: it does not
+/// download, install, or open anything, it sends nothing about the machine, and it never fires on
+/// its own. Both callers are a press or a keypress.
+public enum ReleaseFetcher {
+
+    public static let releasesAPI = URL(string: "https://api.github.com/repos/tiylabs/plume/releases/latest")!
+    public static let releasesPage = URL(string: "https://github.com/tiylabs/plume/releases")!
+
+    /// The page for one release — its notes and its download — or the list when the tag is not
+    /// plainly a version (`ReleaseCheck.releasePage` says why).
+    public static func releasePage(for tag: String) -> URL {
+        ReleaseCheck.releasePage(tag: tag, in: releasesPage) ?? releasesPage
+    }
+
+    /// `CFBundleShortVersionString`, which `build-app.sh` writes from the tag.
+    public static var runningVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+    }
+
+    /// Asks GitHub for the latest tag and compares it with the running build.
+    ///
+    /// `.unknown` covers every way this can fail — no network, a rate limit, a captive portal
+    /// answering with a login page — because none of them is something the reader can act on
+    /// differently (decision 76). The caller decides whether silence or a sentence is right:
+    /// the About button says so, the summon check says nothing at all.
+    public static func fetchStatus(
+        using fetcher: any HTTPFetching = URLSessionFetcher(),
+        runningVersion current: String = ReleaseFetcher.runningVersion,
+        completion: @escaping @Sendable (ReleaseCheck.Status) -> Void
+    ) {
+        fetcher.fetch(request(runningVersion: current)) { data, error in
+            let tag = data.flatMap {
+                (try? JSONSerialization.jsonObject(with: $0)) as? [String: Any]
+            }?["tag_name"] as? String
+
+            guard error == nil, let tag else {
+                completion(.unknown)
+                return
+            }
+            completion(ReleaseCheck.status(current: current, latest: tag))
+        }
+    }
+
+    /// The request, separate from sending it so a test can read exactly what would go out.
+    public static func request(runningVersion current: String) -> URLRequest {
+        var request = URLRequest(url: releasesAPI)
+        request.timeoutInterval = 10
+        // GitHub's API refuses a request with no User-Agent. It carries the version rather than
+        // anything about the machine, because the version is the only thing the request is about.
+        request.setValue("Plume/\(current)", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        return request
+    }
+}

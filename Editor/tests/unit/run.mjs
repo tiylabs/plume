@@ -18,7 +18,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
-const out = resolve(root, "dist/unit");
+// Not under dist/: Scripts/build-app.sh copies all of dist/ into the app bundle.
+const out = resolve(root, ".test-build/unit");
 await mkdir(out, { recursive: true });
 
 const files = (await readdir(here)).filter((f) => f.endsWith(".test.ts")).sort();

@@ -23,7 +23,7 @@
 
 import { ChangeSet, EditorSelection, EditorState, type Extension, type SelectionRange, Transaction } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
-import { markerSpanEnd } from "../blocks";
+import { markerSpanEnd } from "../markdown/blocks";
 import type { Command } from "./edit";
 import { isSeam, spansIn, type Span } from "./spans";
 

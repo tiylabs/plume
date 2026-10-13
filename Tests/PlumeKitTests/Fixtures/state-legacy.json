@@ -1,0 +1,40 @@
+{
+  "availableUpdate" : "0.9.0",
+  "lastUpdateCheck" : "2026-10-01T08:30:00Z",
+  "notes" : {
+    "2026-08-11-1453-first-few-words.md" : {
+      "caretOffset" : 42,
+      "isPinned" : true,
+      "lastOpened" : "2026-10-02T09:00:00Z",
+      "scrollLine" : 3
+    },
+    "2026-09-01-0900-other.md" : {
+      "caretOffset" : 0,
+      "isPinned" : false,
+      "scrollLine" : 0
+    }
+  },
+  "plumes" : [
+    {
+      "autoSizing" : false,
+      "frames" : {
+        "primary" : {
+          "height" : 420,
+          "width" : 460,
+          "x" : 100,
+          "y" : 200
+        }
+      },
+      "id" : "E621E1F8-C36C-495A-93FC-0C247A3E6E5F",
+      "lastSize" : {
+        "height" : 420,
+        "width" : 460
+      },
+      "manualHeight" : 420,
+      "noteFilename" : "2026-08-11-1453-first-few-words.md",
+      "showsFormatBar" : true
+    }
+  ],
+  "schemaVersion" : 1,
+  "vaultEverCreated" : true
+}

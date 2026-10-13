@@ -23,10 +23,10 @@
 
 import type { LineContext } from "./context";
 import { NOOP, rows, type KeyEdit } from "./edit";
-import { outdentEdit } from "../list-indent";
+import { outdentEdit } from "../markdown/list-indent";
 import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
-import { fencedBlockAt, fenceOrRuleLine, fencesOf } from "../blocks";
+import { fencedBlockAt, fenceOrRuleLine, fencesOf } from "../markdown/blocks";
 
 const DELETE = "delete.backward";
 

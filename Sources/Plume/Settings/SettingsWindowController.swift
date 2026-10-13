@@ -74,7 +74,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         // window is opened rarely and never on the hot path, and a lazily-loaded tab would have to
         // guess its own size before it had one.
         let sized = [general, storage, appearance, about] as [NSViewController]
-        let height = sized.map(\.view.fittingSize.height).max() ?? PlumePanel.defaultHeight
+        let height = sized.map(\.view.fittingSize.height).max() ?? PanelWindow.defaultHeight
         let size = NSSize(width: SettingsForm.contentWidth, height: height)
         for controller in [general, storage, appearance, shortcuts, about] as [NSViewController] {
             controller.preferredContentSize = size
@@ -89,7 +89,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.title = tr("settings.title")
         window.isReleasedWhenClosed = false
         // Follow Plume's own Light / Dark choice, not just the system's: the panel panel already does
-        // (`PlumeController.applySettings`), and a settings window left on the system appearance
+        // (`PanelController.applySettings`), and a settings window left on the system appearance
         // stays light while the panel it configures is dark.
         window.appearance = settings.value.appearance.nsAppearance
         window.center()
@@ -110,8 +110,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     /// a window you cannot find.
     func present() {
         // The panel is `.floating` and this is an ordinary window, so without this it opens *behind*
-        // the panel with its first rows covered. See `PlumePanel.stepAside`.
-        PlumePanel.stepAside()
+        // the panel with its first rows covered. See `PanelWindow.stepAside`.
+        PanelWindow.stepAside()
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
@@ -122,7 +122,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     /// And the panel goes back to floating the moment this window is gone.
     func windowWillClose(_ notification: Notification) {
-        PlumePanel.resumeFloating()
+        PanelWindow.resumeFloating()
     }
 
     /// The Storage tab grew — Git's rows opened — or shrank back. The window follows, from its top

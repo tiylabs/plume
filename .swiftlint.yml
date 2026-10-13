@@ -2,6 +2,7 @@
 # names, big view controllers). Add rules back as the code is brought in line.
 included:
   - Sources
+  - Tests   # the PlumeKit suite (Tests/PlumeKitTests), which has its own nested .swiftlint.yml
 excluded:
   - .build
   - build
@@ -11,11 +12,29 @@ disabled_rules:
   - trailing_comma        # multi-line literals keep their trailing comma
   - identifier_name       # x / y / dx / i are the right names in geometry code
   - line_length           # comments carry the decision record and run long
-  - file_length
-  - type_body_length
-  - function_body_length
   - cyclomatic_complexity
   - large_tuple
   - type_name
 
 opt_in_rules: []
+
+# Length rules are a ratchet, not a style opinion: the error thresholds sit just above the largest
+# current non-test offender (measured with swiftlint 0.63.2, the version CI pins), so nothing new can
+# grow past today's worst, and the warning thresholds are the target. Design/Notes/architecture-
+# refactor-plan.md lowered them in each phase; warnings do not fail the build.
+#
+# After phase 4 (2026-10-13), measured:
+#   file_length            largest: NoteSession.swift 702, AppDelegate.swift 683  -> error 800
+#   type_body_length       largest: AppDelegate 417, NoteSession 380              -> error 450
+#   function_body_length   largest: AppearanceSettingsViewController 78          -> error 100
+# The plan's own end-state was 1000 / 700 / 150; the code came in well under it, so the ratchet
+# follows the code rather than the plan.
+file_length:
+  warning: 600
+  error: 800
+type_body_length:
+  warning: 400
+  error: 450
+function_body_length:
+  warning: 80
+  error: 100

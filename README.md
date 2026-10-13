@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="artifacts/plume-icon.png" alt="Plume app icon" width="120">
+  <img src="Artifacts/plume-icon.png" alt="Plume app icon" width="120">
 </p>
 
 <h1 align="center">Plume</h1>
@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="artifacts/plume-hero.png" alt="The Plume panel floating above a code editor, showing a markdown note rendered live" width="760">
+  <img src="Artifacts/plume-hero.png" alt="The Plume panel floating above a code editor, showing a markdown note rendered live" width="760">
 </p>
 
 Press <kbd>⌃⌥Space</kbd> to bring a floating note over your current app, write, and dismiss it.
