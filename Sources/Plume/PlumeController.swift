@@ -109,7 +109,8 @@ final class PlumeController: NSObject {
     /// changes. Creation simply moves from the keystroke that asks for a note to the first write of
     /// one, which is the first moment there is anything to name it after. It also means a note you
     /// asked for and did not write in leaves nothing at all, which is what it should have done.
-    private var isDraft = false
+    private var draft = DraftLifecycle()
+    private var isDraft: Bool { draft.isDraft }
 
     /// One create in flight at a time, for `flush`'s reason: two would make two files.
     private var isMaterialising = false
@@ -679,7 +680,7 @@ final class PlumeController: NSObject {
         if recordingHistory { recordVisit(filename) }
         // Opening a real note ends any draft. The draft's own text, if it had any, was written by
         // the `flush(trigger: .noteSwitched)` every caller of `open` runs first.
-        isDraft = false
+        draft.end()
         currentFilename = filename
         bufferText = text
         baselineHash = hash
@@ -723,7 +724,7 @@ final class PlumeController: NSObject {
         currentFilename = nil
         bufferText = ""
         baselineHash = nil
-        isDraft = true
+        draft.begin()
 
         var plume = plumeState
         plume.noteFilename = nil
@@ -764,16 +765,26 @@ final class PlumeController: NSObject {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         guard !isMaterialising else { return }
         isMaterialising = true
+        // Which draft asked: the answer arrives later, by which time ⌘N may have put a different draft
+        // on screen, and "a draft is showing" would then be true for the wrong one (`DraftLifecycle`).
+        let ticket = draft.ticket
 
         vault.create(text: text) { [weak self] result in
             guard let self else { return }
             self.isMaterialising = false
             switch result {
             case .success(let created):
-                // A note may have been opened while the create was in flight, which makes this
-                // draft somebody else's problem — it is already on disk and no longer on screen.
-                guard self.isDraft else { return }
-                self.isDraft = false
+                // A note may have been opened while the create was in flight, or ⌘N may have
+                // started a newer draft; either makes this draft somebody else's problem — it is
+                // already on disk and no longer on screen. Adopting it into a newer draft's buffer
+                // is what used to overwrite this file with that draft's text.
+                guard self.draft.isCurrent(ticket) else {
+                    // A newer draft's own flush may have been refused while this create was in
+                    // flight (one create at a time), so give it its turn now.
+                    if self.isDraft { self.materialiseDraft() }
+                    return
+                }
+                self.draft.end()
                 self.adoptDraft(filename: created.filename, hash: created.hash)
             case .failure(let error):
                 self.showBanner(.problem(tr("error.createFailed", ["message": error.localizedDescription])))
