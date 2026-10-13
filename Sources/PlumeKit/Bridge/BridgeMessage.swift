@@ -62,7 +62,7 @@ public enum BridgeMessage: Decodable, Equatable, Sendable {
     case forgetDeleted(storedName: String)
     /// ⌘= / ⌘− / ⌘0. Swift owns `Settings.textSize`, so the web layer asks rather than sets.
     case textSize(action: String)
-    /// ⌘[ / ⌘]. The visit history lives in `PanelController`, so this only asks.
+    /// ⌘[ / ⌘]. Previous/Next follow the switcher list; `NoteSession` chooses the adjacent note.
     case navigate(back: Bool)
     /// Where the window may be dragged from, in CSS pixels with a top-left origin. Sent by the web
     /// layer because only it knows where its own buttons ended up.

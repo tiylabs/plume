@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > are recorded in its history, not in this file. The entries below cover this fork only. The project was renamed from Pane to Plume after v0.3.1075;
 > the older entries and their links still use the former name and repository path `tiylabs/pane`.
 
+## [Unreleased]
+### Fixed
+- Make Command+[ / Command+] select the previous/next note in the Browse Notes order, including immediately after launch, instead of requiring a visit history.
+
 ## [v0.4.1075] - 2026-10-11
 ### :sparkles: New Features
 - [`6f57f89`](https://github.com/tiylabs/plume/commit/6f57f89ea5ba7a16a92005ee355407dc7956581a) - **settings**: ✨ Halve the panel transparency range and default to 50% *(commit by [@jorben](https://github.com/jorben))*

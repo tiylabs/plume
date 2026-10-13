@@ -121,8 +121,8 @@ public final class NoteSession {
         }
     }
 
-    /// `recordingHistory` is false only when ⌘[ / ⌘] are the ones doing the opening — walking the
-    /// history must not itself write history, or Back would just alternate between two notes forever.
+    /// `recordingHistory` is false for adjacent-note navigation and external reloads. These preserve
+    /// the navigation order; an explicit note selection starts a new traversal of the switcher list.
     public func open(_ filename: String, recordingHistory: Bool = true) {
         guard filename != currentFilename else {
             output.focusEditor()
@@ -192,10 +192,9 @@ public final class NoteSession {
         // buffer without putting what was in it somewhere first.
         if filename != currentFilename { flush(trigger: .noteSwitched) }
 
-        // Recorded here rather than in `open` so the history can only ever contain notes that really
-        // opened — a filename that turned out to be missing never reaches this line, which is what
-        // keeps Back from walking onto a note that has since been deleted.
-        if recordingHistory { recordVisit(filename) }
+        // Explicitly opening a note resets traversal only after it has loaded successfully. Failed
+        // opens and external reloads must not reorder the list underneath repeated Previous/Next.
+        if recordingHistory { navigationOrder = nil }
         // Opening a real note ends any draft. The draft's own text, if it had any, was written by
         // the `flush(trigger: .noteSwitched)` every caller of `open` runs first.
         isDraft = false
@@ -305,7 +304,7 @@ public final class NoteSession {
     /// sending `loadNote` would replace the document under their hands and move the caret. All that
     /// changes here is which file the buffer belongs to.
     private func adoptDraft(filename: String, hash: String) {
-        recordVisit(filename)
+        navigationOrder = nil
         currentFilename = filename
         baselineHash = hash
         // Decision 103. This is the exact case the decision exists for: the file has just appeared
@@ -554,7 +553,7 @@ public final class NoteSession {
     /// **This is decision 74's list**, and it has now been got wrong twice — Move Notes wrote to the
     /// old folder, and after a conflict the editor did not know which file it was in, so ⌃X would
     /// have deleted the original. One function so there is one list: the panel's own pointer, the
-    /// state entry carrying the caret, the pin and `lastOpened`, the panel record, the visit history,
+    /// state entry carrying the caret, the pin and `lastOpened`, the panel record, the navigation order,
     /// the web layer's copy of the name, the menu bar's pins, and an open switcher.
     ///
     /// `baselineHash` is deliberately untouched: a rename moves the same bytes, so what is on disk
@@ -569,9 +568,9 @@ public final class NoteSession {
 
         setPanelNote(new)
 
-        // Back and Forward hold filenames, so an un-rewritten entry is a ⌘[ onto a file that no
+        // Previous and Next hold filenames, so an un-rewritten entry is a ⌘[ onto a file that no
         // longer exists — which `open` would then treat as a missing note and drop from state.
-        history.rename(old, to: new)
+        navigationOrder = navigationOrder?.map { $0 == old ? new : $0 }
 
         // The web layer is told for the same reason the conflict path tells it: `loadNote` is the
         // only other thing that sets this, and this path must not reload (it would move the caret).
@@ -676,20 +675,39 @@ public final class NoteSession {
     /// The buffer as the session last heard it, for actions that act on the whole note.
     public var buffer: String { bufferText }
 
-    // MARK: - History
+    // MARK: - Adjacent notes
 
-    private var history = NavigationHistory()
+    /// Keep the switcher's order across consecutive steps: opening a note updates `lastOpened`, so
+    /// re-sorting by Recently Opened on every press would move the destination to the top and make
+    /// Next bounce between the same two notes. An explicit open or a changed sort preference resets it.
+    private var navigationOrder: [String]?
+    private var navigationSort: Settings.NoteOrder?
 
-    private func recordVisit(_ filename: String) { history.recordVisit(filename) }
+    public func goBack() { navigateAdjacent(back: true) }
 
-    public func goBack() {
-        guard let filename = history.back() else { return }
-        open(filename, recordingHistory: false)
-    }
+    public func goForward() { navigateAdjacent(back: false) }
 
-    public func goForward() {
-        guard let filename = history.forward() else { return }
-        open(filename, recordingHistory: false)
+    private func navigateAdjacent(back: Bool) {
+        guard let current = currentFilename else { return }
+        let sort = settings.value.noteOrder
+        if navigationSort != sort {
+            navigationOrder = nil
+            navigationSort = sort
+        }
+        vault.rows(query: "", state: state.value, current: current, order: sort) { [weak self] snapshot in
+            // A delayed list must not navigate away from a note explicitly selected meanwhile.
+            guard let self, self.currentFilename == current, self.settings.value.noteOrder == sort else { return }
+            let listed = snapshot.rows.map(\.filename)
+            let present = Set(listed)
+            let ordered = self.navigationOrder.map { previous in
+                previous.filter { present.contains($0) } + listed.filter { !previous.contains($0) }
+            } ?? listed
+            self.navigationOrder = ordered
+            guard let index = ordered.firstIndex(of: current) else { return }
+            let next = index + (back ? -1 : 1)
+            guard ordered.indices.contains(next) else { return }
+            self.open(ordered[next], recordingHistory: false)
+        }
     }
 
     // MARK: - Panel record

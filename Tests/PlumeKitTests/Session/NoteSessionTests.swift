@@ -351,31 +351,65 @@ func runNoteSessionTests() {
         }
 
         // S14
-        Check.mainTest("S14 Back and Forward do not write history, and never reach a deleted note") {
+        Check.mainTest("S14 Previous and Next work after opening only one note") {
             let r = SessionRig()
+            let c = "2026-01-01-0003-gamma.md"
             r.seed(a, "alpha\n", lastOpened: t0)
             r.seed(b, "beta\n")
-            r.seed("2026-01-01-0003-gamma.md", "gamma\n")
-            r.open(a)
-            r.session.open(b); r.vault.releaseAll()
-            r.session.open("2026-01-01-0003-gamma.md"); r.vault.releaseAll()
-            Check.equal(r.session.currentFilename, "2026-01-01-0003-gamma.md")
+            r.seed(c, "gamma\n")
+            r.vault.rowOrder = [a, b, c]
+            r.open(b)
 
+            r.session.goBack(); r.vault.releaseAll()
+            Check.equal(r.session.currentFilename, a, "Previous uses the list, even without a previous visit")
+            r.session.goBack(); r.vault.releaseAll()
+            Check.equal(r.session.currentFilename, a, "Previous stops at the first row")
+            r.session.goForward(); r.vault.releaseAll()
+            Check.equal(r.session.currentFilename, b)
+            r.session.goForward(); r.vault.releaseAll()
+            Check.equal(r.session.currentFilename, c)
+            r.session.goForward(); r.vault.releaseAll()
+            Check.equal(r.session.currentFilename, c, "Next stops at the last row")
+
+            r.vault.rowOrder = [a, c]
+            r.session.goBack(); r.vault.releaseAll()
+            Check.equal(r.session.currentFilename, a, "removed rows are skipped")
+        }
+
+        Check.mainTest("adjacent navigation keeps its order when opening changes recency") {
+            let r = SessionRig()
+            let c = "2026-01-01-0003-gamma.md"
+            for name in [a, b, c] { r.seed(name, name + "\n") }
+            r.settings.update { $0.noteOrder = .opened }
+            r.vault.rowOrder = [a, b, c]
+            r.open(a)
+            r.session.goForward(); r.vault.releaseAll()
+            Check.equal(r.session.currentFilename, b)
+            r.vault.rowOrder = [b, a, c]
+            r.session.goForward(); r.vault.releaseAll()
+            Check.equal(r.session.currentFilename, c, "opening B must not make Next return to A")
+            r.vault.rowOrder = [c, b, a]
             r.session.goBack(); r.vault.releaseAll()
             Check.equal(r.session.currentFilename, b)
-            r.session.goBack(); r.vault.releaseAll()
-            Check.equal(r.session.currentFilename, a)
-            r.session.goForward(); r.vault.releaseAll()
-            Check.equal(r.session.currentFilename, b, "walking the history did not add to it")
-            r.session.goForward(); r.vault.releaseAll()
-            Check.equal(r.session.currentFilename, "2026-01-01-0003-gamma.md")
 
-            // A note that failed to open never enters the history, so Back cannot land on it.
-            r.state.update { $0.notes["ghost.md"] = NoteState() }
-            r.session.open("ghost.md"); r.vault.release(where: isLoad)
+            r.open(a)
+            r.vault.rowOrder = [a, c, b]
+            r.session.goForward(); r.vault.releaseAll()
+            Check.equal(r.session.currentFilename, c, "explicit selection starts from the latest list")
+        }
+
+        Check.mainTest("a delayed navigation list cannot replace a newly selected note") {
+            let r = SessionRig()
+            r.seed(a, "alpha\n")
+            r.seed(b, "beta\n")
+            r.vault.rowOrder = [a, b]
+            r.open(a)
+            r.session.goForward()
+            r.session.open(b)
+            r.vault.release(where: isLoad)
             r.vault.releaseAll()
-            r.session.goBack(); r.vault.releaseAll()
-            Check.expect(r.session.currentFilename != "ghost.md")
+            Check.equal(r.session.currentFilename, b)
+            Check.equal(r.vault.count(where: isLoad), 2, "the obsolete list must not trigger another load")
         }
     }
 
