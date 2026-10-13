@@ -73,7 +73,8 @@ public final class NoteSession {
     /// changes. Creation simply moves from the keystroke that asks for a note to the first write of
     /// one, which is the first moment there is anything to name it after. It also means a note you
     /// asked for and did not write in leaves nothing at all, which is what it should have done.
-    public internal(set) var isDraft = false
+    private var draft = DraftLifecycle()
+    public var isDraft: Bool { draft.isDraft }
 
     /// One create in flight at a time, for `flush`'s reason: two would make two files.
     private var isMaterialising = false
@@ -197,7 +198,7 @@ public final class NoteSession {
         if recordingHistory { navigationOrder = nil }
         // Opening a real note ends any draft. The draft's own text, if it had any, was written by
         // the `flush(trigger: .noteSwitched)` every caller of `open` runs first.
-        isDraft = false
+        draft.end()
         currentFilename = filename
         bufferText = text
         baselineHash = hash
@@ -241,7 +242,7 @@ public final class NoteSession {
         currentFilename = nil
         bufferText = ""
         baselineHash = nil
-        isDraft = true
+        draft.begin()
 
         setPanelNote(nil)
 
@@ -280,16 +281,24 @@ public final class NoteSession {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         guard !isMaterialising else { return }
         isMaterialising = true
+        // The answer may arrive after ⌘N has replaced this draft with another one. A draft flag
+        // would be true for both; only the ticket identifies the buffer that asked for the file.
+        let ticket = draft.ticket
 
         vault.create(text: text) { [weak self] result in
             guard let self else { return }
             self.isMaterialising = false
             switch result {
             case .success(let created):
-                // A note may have been opened while the create was in flight, which makes this
-                // draft somebody else's problem — it is already on disk and no longer on screen.
-                guard self.isDraft else { return }
-                self.isDraft = false
+                // Keep the created file on disk when its draft is no longer showing. Binding a
+                // newer draft to this file would overwrite the old draft with the newer buffer.
+                guard self.draft.isCurrent(ticket) else {
+                    // The newer draft's flush may have been refused by the one-create gate.
+                    // Give it its turn now, using its own buffer and ticket.
+                    if self.isDraft { self.materialiseDraft() }
+                    return
+                }
+                self.draft.end()
                 self.adoptDraft(filename: created.filename, hash: created.hash)
             case .failure(let error):
                 self.output.show(.problem(L10n.t("error.createFailed", ["message": error.localizedDescription])))
