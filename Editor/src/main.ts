@@ -56,18 +56,23 @@ import { deleteOverMarks, keepPairs, moveOverSeams } from "./keyboard/pairs";
 import { openAbove, openAboveLeft, openBelow, openBelowRight } from "./keyboard/fence-exit";
 import { moveBlockDown, moveBlockUp, nothing, selectBlockEnd, selectBlockStart } from "./keyboard/move-block";
 import { shiftTab, tab } from "./keyboard/tab";
-import { caretBlankLineSlack, livePreview } from "./markdown/live-preview";
+import { livePreview } from "./markdown/live-preview";
 import { renumberOrderedLists } from "./markdown/renumber";
 import { plumeDialect } from "./markdown/dialect";
 import { mountSwitcher } from "./ui/switcher";
 import { MARKDOWN_FORMAT_KEYS, mountFormatBar, setHeading, pendingWrapExtension } from "./ui/format-bar";
-import { noteTitle } from "./markdown/note-title";
-import { countCharacters, countWords } from "./markdown/word-count";
-import { onLanguageChange, plural, setLanguage, t, translateStaticMarkup } from "./i18n";
-import type { DockSpaceAssignmentState, HostAPI, NoteSummary, OutboundMessage, Rect, SpaceAssignmentState } from "./bridge/protocol";
+import { onLanguageChange, setLanguage, t, translateStaticMarkup } from "./i18n";
+import type { DockSpaceAssignmentState, HostAPI, NoteSummary } from "./bridge/protocol";
 import { bulletInputRule, checkboxInputRule, fenceInputRule, ruleInputRule } from "./editor/input-rules";
 import { backspaceKey, deleteKey, selectBlockThenAll } from "./editor/select-block";
 import { DEFAULT_SHORTCUTS, keyCaps, matchesBinding } from "./editor/shortcuts";
+import { send } from "./bridge/send";
+import { actionsEl, bannerEl, closeEl, editorHost, panelEl, switcherEl, themeStyleEl } from "./editor/dom";
+import { ctx } from "./editor/ctx";
+import { state } from "./editor/state";
+import {
+  hideBanner, renderCount, reportDragRegions, scheduleContentHeight, showBanner, showTitle, showToast,
+} from "./editor/chrome";
 
 // ---------------------------------------------------------------------------------------------
 // Bridge
@@ -79,41 +84,6 @@ declare global {
     plumeHost: HostAPI;
   }
 }
-
-function send(message: OutboundMessage): void {
-  // Absent when the bundle is opened directly in a browser for design work, which is a legitimate
-  // way to run it — so this must degrade to a no-op rather than throw.
-  window.webkit?.messageHandlers?.plume?.postMessage(message);
-}
-
-// ---------------------------------------------------------------------------------------------
-// Editor
-// ---------------------------------------------------------------------------------------------
-
-const panelEl = document.getElementById("plume") as HTMLElement;
-const titleBarEl = document.getElementById("titlebar") as HTMLElement;
-const closeEl = document.getElementById("close") as HTMLElement;
-const panelTitleEl = document.getElementById("plume-title") as HTMLElement;
-const wordCountEl = document.getElementById("word-count") as HTMLElement;
-const editorHost = document.getElementById("editor-host") as HTMLElement;
-const toastEl = document.getElementById("toast") as HTMLElement;
-/** Auto-dismiss timers for the toast above. */
-let toastTimer = 0;
-let toastFadeTimer = 0;
-
-const bannerEl = document.getElementById("banner") as HTMLElement;
-const bannerTextEl = document.getElementById("banner-text") as HTMLElement;
-
-/// Where a user's markdown theme lands (decision 19). Appended last so it wins the cascade against
-/// the bundled stylesheets without needing !important.
-const themeStyleEl = document.createElement("style");
-themeStyleEl.id = "markdown-theme";
-document.head.appendChild(themeStyleEl);
-
-/** Suppresses the `edited` message while Swift is loading a note into the buffer. */
-let applyingRemoteEdit = false;
-
-let currentFilename: string | null = null;
 
 const editorTheme = EditorView.theme({
   "&": { height: "100%" },
@@ -128,107 +98,8 @@ function notifyEdited(view: EditorView): void {
   scheduleContentHeight();
 }
 
-/** The note's name — its first non-blank line read as prose, one `noteTitle` for the bar and the
- * switcher, followed as it is typed (decisions 2, 67). */
-function showTitle(lines: Iterable<string>): void {
-  // "Untitled" rather than nothing, which is what an empty note showed until ⌘N stopped writing a
-  // file the moment it was pressed. A panel with no title and no text reads as broken; the reference
-  // names it, and the switcher already calls a nameless note Untitled, so this is the two agreeing.
-  panelTitleEl.textContent = noteTitle(lines) || t("editor.untitled");
-}
-
-/** The footer's number, and which one: a press swaps it, and it carries no bubble — a number in
- * English says its own name (decisions 124, 76). */
-let footerCount: "words" | "characters" = "words";
-
-function formatWordCount(n: number): string {
-  return plural("editor.count.words", n);
-}
-
-function renderCount(text: string): void {
-  if (footerCount === "characters") {
-    const n = countCharacters(text);
-    wordCountEl.textContent = plural("editor.count.characters", n);
-  } else {
-    wordCountEl.textContent = formatWordCount(countWords(text));
-  }
-}
-
-/**
- * Tells Swift how tall the note wants to be, so the window can follow it.
- *
- * Rule 2 is implemented on the Swift side — width fixed, height grows downward until 24px from the
- * screen bottom, then the note scrolls. All the web layer contributes is the desired height.
- */
-let lastReportedHeight = -1;
-let heightFrame = 0;
-let settlePass = false;
-
-/**
- * Content height is asked for when the *content* changes, plus one settle pass for CodeMirror's
- * refined layout — never from the `ResizeObserver`, which fed a report → resize → re-estimate loop
- * and made the panel overshoot on every new line (decision 40, amended 2026-09-17).
- */
-function scheduleContentHeight(): void {
-  if (heightFrame) return;
-  heightFrame = requestAnimationFrame(() => {
-    heightFrame = 0;
-    settlePass = false;
-    reportContentHeight();
-  });
-}
-
-function reportContentHeight(): void {
-  // `view.contentHeight`, never `scrollHeight`: the host is `height: 100%`, so scrollHeight equals
-  // clientHeight and the panel would report its current height as the one it wants. Minus the caret's
-  // blank-line slack, a rendering choice the window must not follow (`caretBlankLineSlack`).
-  const content = view.contentHeight - caretBlankLineSlack(view);
-
-  // Whichever of the three rows is laid out, found by measuring: with ⌘F open both the footer and
-  // the format bar are hidden, and reading an attribute measured a `display: none` row as 0 (decision 66).
-  const bar = [".find", ".format-bar", ".plume__footer"]
-    .map((selector) => panelEl.querySelector<HTMLElement>(selector))
-    .find((element) => (element?.offsetHeight ?? 0) > 0);
-  const chrome = titleBarEl.offsetHeight + (bar?.offsetHeight ?? 0) + bannerEl.offsetHeight;
-
-  const height = Math.ceil(content + chrome);
-
-  // An unchanged answer is not worth a resize, and re-sending one is how a two-value oscillation
-  // stays alive.
-  if (height === lastReportedHeight) return;
-  lastReportedHeight = height;
-  send({ type: "contentHeight", height });
-
-  // One re-measure after the window has had a frame to become the size we just asked for. If the
-  // refined layout disagrees, that correction is sent and the chain stops there.
-  if (settlePass) return;
-  settlePass = true;
-  requestAnimationFrame(() => requestAnimationFrame(reportContentHeight));
-}
-
-/** Tells Swift where the window may be dragged from. `-webkit-app-region` is inert in a WKWebView
- * (LAB, 2026-08-15), so the web layer measures the title bar minus its buttons and Swift hit-tests. */
-function reportDragRegions(): void {
-  const box = (el: Element): Rect => {
-    const r = el.getBoundingClientRect();
-    return { x: r.x, y: r.y, width: r.width, height: r.height };
-  };
-  const bar = box(titleBarEl);
-  const exclusions = Array.from(titleBarEl.querySelectorAll("button")).map(box);
-
-  send({
-    type: "dragRegions",
-    titleBar: bar,
-    exclusions,
-    // Named rather than picked out of `exclusions` by index (decision 107). The dot is already in
-    // that list — it is a button in the bar — but reading it back out means depending on document
-    // order, and the pin comes and goes from this bar with the pinned state.
-    close: box(closeEl),
-  });
-}
-
 const updateListener = EditorView.updateListener.of((update) => {
-  if (update.docChanged && !applyingRemoteEdit) {
+  if (update.docChanged && !state.applyingRemoteEdit) {
     notifyEdited(update.view);
   } else if (update.selectionSet) {
     const head = update.state.selection.main.head;
@@ -269,12 +140,12 @@ const actionHandlers: Record<string, () => boolean> = {
   browseNotes: () => (toggleSwitcher(), true),
   navigateBack: () => (send({ type: "navigate", back: true }), true),
   navigateForward: () => (send({ type: "navigate", back: false }), true),
-  pinPlume: () => (send({ type: "togglePin", filename: currentFilename }), true),
+  pinPlume: () => (send({ type: "togglePin", filename: state.currentFilename }), true),
   formatBar: () => (toggleFormatBar(), true),
   revealInFinder: () => (send({ type: "revealInFinder" }), true),
   settings: () => (send({ type: "openSettings" }), true),
   deleteNote: () =>
-    currentFilename ? (send({ type: "deleteNote", filename: currentFilename }), true) : false,
+    state.currentFilename ? (send({ type: "deleteNote", filename: state.currentFilename }), true) : false,
   findInNote: () => (find?.open(), true),
   // ⌥⌘F is the macOS convention for find-and-replace and one Raycast leaves free, so decision 39's
   // habit-compatibility rule is untouched. No ⌘K row: the disclosure on the find bar is where
@@ -455,6 +326,7 @@ const view = new EditorView({
   state: EditorState.create({ doc: "", extensions: baseExtensions() }),
   parent: editorHost,
 });
+ctx.view = view;
 
 // ---------------------------------------------------------------------------------------------
 // Chrome
@@ -477,7 +349,7 @@ function toggleFormatBar(): void {
  * (decision 124). */
 document.getElementById("word-count")!.addEventListener("mousedown", (event) => {
   event.preventDefault();
-  footerCount = footerCount === "words" ? "characters" : "words";
+  state.footerCount = state.footerCount === "words" ? "characters" : "words";
   renderCount(view.state.doc.toString());
   send({ type: "toggleFooterCount" });
 });
@@ -495,7 +367,7 @@ document.getElementById("new-note")!.addEventListener("click", () =>
   send({ type: "createNote", title: "" })
 );
 document.getElementById("pin")!.addEventListener("click", () =>
-  send({ type: "togglePin", filename: currentFilename })
+  send({ type: "togglePin", filename: state.currentFilename })
 );
 document.getElementById("browse")!.addEventListener("click", () => toggleSwitcher());
 document.getElementById("open-actions")!.addEventListener("click", () => toggleActions());
@@ -530,22 +402,23 @@ function refreshChromeTooltips(): void {
         ? "editor.tip.keepOnTop.on"
         : labelKey
     );
-    const binding = action ? liveShortcuts[action] ?? DEFAULT_SHORTCUTS[action] : undefined;
+    const binding = action ? state.liveShortcuts[action] ?? DEFAULT_SHORTCUTS[action] : undefined;
     describe(element, binding ? `${label} ${keyCaps(binding).join("")}` : label);
   }
 }
-// The first call lives beside `liveShortcuts` below, not here: that binding is a `let` declared
-// further down the file, and reading it from up here is a temporal-dead-zone throw — which took
-// out `window.plumeHost` entirely and presented as the whole bridge being missing.
+// The first call is below, after everything it reads has been built. It used to be that the binding
+// table was a `let` declared further down the file, and calling this from up here threw — which took
+// out `window.plumeHost` entirely and presented as the whole bridge being missing. The table now
+// lives in `state`, so that particular ordering no longer exists; the first call stays where it was.
 
-formatBar = mountFormatBar(
+formatBar = ctx.formatBar = mountFormatBar(
   document.getElementById("format-bar") as HTMLElement,
   view,
   toggleFormatBar,
   (button, level) => send({ type: "headingMenu", button, level })
 );
 
-find = mountFind({
+find = ctx.find = mountFind({
   root: document.getElementById("find") as HTMLElement,
   panel: panelEl,
   view,
@@ -554,18 +427,6 @@ find = mountFind({
     reportDragRegions();
   },
 });
-
-/** Swift owns this — it is a window property, not a document one — and mirrors it back here. */
-let hiddenFromCapture = false;
-/** Likewise window state, and it changes without this layer being asked: dragging the panel turns it
- *  off (decision 40). Only ever set from Swift. */
-let autoSizing = true;
-/** Which desktop the panel is assigned to. Swift's to decide — the page cannot see Spaces. */
-let spaceAssignment: SpaceAssignmentState = { mode: "unassigned", desktop: null, canKeepToOne: false };
-let dockSpaceAssignment: DockSpaceAssignmentState = { mode: "checking", desktop: null };
-
-const actionsEl = document.getElementById("actions") as HTMLElement;
-const switcherEl = document.getElementById("switcher") as HTMLElement;
 
 /* Both overlays are placed by one calculation whenever the panel opens, its height changes, or the
  * panel's height changes after Swift grows the window (decision 45). One `ResizeObserver`, and `top`
@@ -578,28 +439,28 @@ function placeOverlays(): void {
 new ResizeObserver(placeOverlays).observe(switcherEl);
 new ResizeObserver(placeOverlays).observe(actionsEl);
 
-const actions = mountActionPanel({
+const actions = ctx.actions = mountActionPanel({
   root: actionsEl,
   panel: panelEl,
   isPinned: () => panelEl.hasAttribute("data-pinned"),
-  isHiddenFromCapture: () => hiddenFromCapture,
-  isAutoSizing: () => autoSizing,
-  spaceAssignment: () => spaceAssignment,
-  dockSpaceAssignment: () => dockSpaceAssignment,
+  isHiddenFromCapture: () => state.hiddenFromCapture,
+  isAutoSizing: () => state.autoSizing,
+  spaceAssignment: () => state.spaceAssignment,
+  dockSpaceAssignment: () => state.dockSpaceAssignment,
   run: (id) => actionHandlers[id]?.(),
   chooseSpace: (mode) => send({ type: "setSpaceAssignment", mode }),
   // The keys a row prints come from the bindings in force, not from a literal beside the label.
   // They were literals, so rebinding New Note in the Shortcuts tab left ⌘K still advertising ⌘N —
   // which is exactly what decision 17 forbids: "a row cannot advertise a key that does something
   // else". Rows with no binding of their own (Settings…, which the menu bar owns) keep the literal.
-  keysFor: (id) => (liveShortcuts[id] ? keyCaps(liveShortcuts[id]) : null),
+  keysFor: (id) => (state.liveShortcuts[id] ? keyCaps(state.liveShortcuts[id]) : null),
   onVisibilityChange: (open, height) => {
     send({ type: "actionsOpen", open, height });
     if (!open) view.focus();
   },
 });
 
-const switcher = mountSwitcher({
+const switcher = ctx.switcher = mountSwitcher({
   root: switcherEl,
   panel: panelEl,
   onQuery: (query) => send({ type: "requestNotes", query }),
@@ -607,8 +468,8 @@ const switcher = mountSwitcher({
   onCreate: (title) => send({ type: "createNote", title }),
   onPin: (filename) => send({ type: "togglePin", filename }),
   onDelete: (filename) => send({ type: "deleteNote", filename }),
-  isDeleteKey: (event) => matchesBinding(event, liveShortcuts.deleteNote ?? DEFAULT_SHORTCUTS.deleteNote!),
-  deleteKeyCaps: () => keyCaps(liveShortcuts.deleteNote ?? DEFAULT_SHORTCUTS.deleteNote!).join(""),
+  isDeleteKey: (event) => matchesBinding(event, state.liveShortcuts.deleteNote ?? DEFAULT_SHORTCUTS.deleteNote!),
+  deleteKeyCaps: () => keyCaps(state.liveShortcuts.deleteNote ?? DEFAULT_SHORTCUTS.deleteNote!).join(""),
   onRequestDeleted: () => send({ type: "requestDeleted" }),
   onRestore: (storedName) => send({ type: "restoreDeleted", storedName }),
   onForgetDeleted: (storedName) => send({ type: "forgetDeleted", storedName }),
@@ -642,9 +503,6 @@ document.getElementById("overlay-scrim")!.addEventListener("mousedown", (event) 
   actions.close();
   switcher.close();
 });
-
-/** The bindings in force, so the listener below follows a rebind from the Settings window. */
-let liveShortcuts: Record<string, string> = { ...DEFAULT_SHORTCUTS };
 refreshChromeTooltips();
 
 /** An open overlay's own shortcut closes it: focus is in a plain `<input>` outside CodeMirror, so the
@@ -656,7 +514,7 @@ document.addEventListener(
     // handling both of these properly and this must stay out of its way.
     if (!actions.isOpen() && !switcher.isOpen()) return;
 
-    const binding = (action: string) => liveShortcuts[action] ?? DEFAULT_SHORTCUTS[action] ?? "";
+    const binding = (action: string) => state.liveShortcuts[action] ?? DEFAULT_SHORTCUTS[action] ?? "";
 
     // Each key keeps its own meaning from inside either panel: it closes its own panel, and swaps
     // to it from the other one. Handling only the closing half left ⌘K doing nothing at all while
@@ -688,11 +546,11 @@ const host: HostAPI = {
    * external-change reload, and a diff would be a second place for the buffer to drift from the file.
    */
   loadNote(filename: string, text: string, caret: number, pinned: boolean): void {
-    applyingRemoteEdit = true;
+    state.applyingRemoteEdit = true;
     // An empty name means a draft: ⌘N no longer touches the disk, so the panel can hold a note that
     // has no file yet. Stored as null rather than "" so every `currentFilename ?` guard here —
     // Delete Note, Pin Note — declines instead of naming a file that does not exist.
-    currentFilename = filename || null;
+    state.currentFilename = filename || null;
 
     const clamped = Math.max(0, Math.min(caret, text.length));
     // `finally`, because a throw here used to leave the flag set for the rest of the session: every
@@ -709,7 +567,7 @@ const host: HostAPI = {
       // And a fresh stack, so undo cannot reach back past this note into the last one.
       clearHistory();
     } finally {
-      applyingRemoteEdit = false;
+      state.applyingRemoteEdit = false;
     }
 
     panelEl.toggleAttribute("data-pinned", pinned);
@@ -739,7 +597,7 @@ const host: HostAPI = {
    * changes.
    */
   setNoteFilename(filename: string): void {
-    currentFilename = filename || null;
+    state.currentFilename = filename || null;
   },
 
   setPinned(pinned: boolean): void {
@@ -795,12 +653,12 @@ const host: HostAPI = {
     if (settings.themeCSS !== undefined) themeStyleEl.textContent = settings.themeCSS;
 
     if (settings.footerCount === "words" || settings.footerCount === "characters") {
-      footerCount = settings.footerCount;
+      state.footerCount = settings.footerCount;
       renderCount(view.state.doc.toString());
     }
 
     if (settings.shortcuts) {
-      liveShortcuts = { ...DEFAULT_SHORTCUTS, ...settings.shortcuts };
+      state.liveShortcuts = { ...DEFAULT_SHORTCUTS, ...settings.shortcuts };
       view.dispatch({
         effects: shortcutsCompartment.reconfigure(panelShortcuts(settings.shortcuts)),
       });
@@ -820,7 +678,7 @@ const host: HostAPI = {
   },
 
   setHiddenFromCapture(hidden: boolean): void {
-    hiddenFromCapture = hidden;
+    state.hiddenFromCapture = hidden;
   },
 
   setKeepOnTop(on: boolean): void {
@@ -830,18 +688,18 @@ const host: HostAPI = {
   },
 
   setSpaceAssignment(mode: string, desktop: number | null, canKeepToOne: boolean): void {
-    spaceAssignment = { mode, desktop, canKeepToOne };
+    state.spaceAssignment = { mode, desktop, canKeepToOne };
     actions.refresh();
   },
 
   setDockSpaceAssignment(mode: DockSpaceAssignmentState["mode"], desktop: number | null): void {
-    if (dockSpaceAssignment.mode === mode && dockSpaceAssignment.desktop === desktop) return;
-    dockSpaceAssignment = { mode, desktop };
+    if (state.dockSpaceAssignment.mode === mode && state.dockSpaceAssignment.desktop === desktop) return;
+    state.dockSpaceAssignment = { mode, desktop };
     actions.refresh();
   },
 
   setAutoSizing(on: boolean): void {
-    autoSizing = on;
+    state.autoSizing = on;
   },
 
   /** The close dot alone, from the same read as `setHover`: `:hover` cannot, because the page gets no
@@ -883,39 +741,11 @@ const host: HostAPI = {
     setHeading(view, level);
   },
 
-  /** A transient confirmation. Out of layout, so it never disturbs the reported height. */
-  showToast(text: string, dwell?: number): void {
-    toastEl.textContent = text;
-    toastEl.hidden = false;
-    toastEl.removeAttribute("data-fading");
-    if (toastTimer) clearTimeout(toastTimer);
-    if (toastFadeTimer) clearTimeout(toastFadeTimer);
-    // 1900ms reads a short receipt; `dwell` is longer for the one toast that is news (decision 136).
-    toastTimer = window.setTimeout(() => {
-      toastEl.setAttribute("data-fading", "");
-      toastFadeTimer = window.setTimeout(() => {
-        toastEl.hidden = true;
-      }, 200);
-    }, dwell ?? 1900);
-  },
+  showToast,
 
-  /**
-   * The one-line status row: a conflict sibling was written, a note is downloading, or something
-   * failed. Never steals the caret and never blocks typing.
-   */
-  showBanner(kind: string, text: string): void {
-    bannerEl.setAttribute("data-kind", kind);
-    bannerTextEl.textContent = text;
-    bannerEl.hidden = false;
-    scheduleContentHeight();
-  },
+  showBanner,
 
-  hideBanner(): void {
-    if (bannerEl.hidden) return;
-    bannerEl.hidden = true;
-    bannerEl.removeAttribute("data-kind");
-    scheduleContentHeight();
-  },
+  hideBanner,
 };
 
 window.plumeHost = host;
