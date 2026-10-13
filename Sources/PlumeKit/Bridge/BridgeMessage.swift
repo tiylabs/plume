@@ -1,14 +1,18 @@
-import AppKit
+import CoreGraphics
 import Foundation
-import PlumeKit
-import WebKit
 
 /// Everything the web layer can tell Swift.
 ///
-/// Mirrors `OutboundMessage` in `Editor/src/main.ts` exactly. Decoded into a Swift enum at the
-/// boundary rather than passed around as a dictionary, so a message the web layer stops sending
-/// becomes a compile error here instead of a silent no-op at runtime.
-enum BridgeMessage {
+/// Mirrors `OutboundMessage` in `Editor/src/bridge/protocol.ts` exactly, and
+/// `BridgeContractTests` holds the two together: the set of message names, and the fields each one
+/// carries. Decoded into a Swift enum at the boundary rather than passed around as a dictionary, so
+/// a message the web layer stops sending becomes a compile error here instead of a silent no-op at
+/// runtime.
+///
+/// Decoding is lenient on purpose, as it always was: a field that is missing or the wrong type reads
+/// as its zero value rather than dropping the message, because a half-understood `edited` is still
+/// better handled than lost. A message whose `type` is unknown *is* dropped.
+public enum BridgeMessage: Decodable, Equatable, Sendable {
     case ready
     case edited(text: String, caret: Int)
     case caret(caret: Int, scrollLine: Int)
@@ -72,100 +76,143 @@ enum BridgeMessage {
     /// origin) and the caret's current heading level, so the menu can tick it.
     case headingMenu(button: CGRect, level: Int?)
 
-    init?(body: Any) {
-        guard let dict = body as? [String: Any], let type = dict["type"] as? String else { return nil }
+    // MARK: - Names
 
-        func string(_ key: String) -> String { dict[key] as? String ?? "" }
-        func number(_ key: String) -> Double { (dict[key] as? NSNumber)?.doubleValue ?? 0 }
+    /// The `type` strings, one per case. Exists so the set of names is enumerable — the contract test
+    /// compares it with the TypeScript union — and so the decoder below is an exhaustive `switch`:
+    /// adding a case here without decoding it is a compile error.
+    public enum Kind: String, CaseIterable, Sendable {
+        case ready, edited, caret, requestNotes, openNote, createNote, togglePin, deleteNote, close
+        case contentHeight, switcherOpen, actionsOpen, revealInFinder, openLink, renameFile
+        case openSettings, copyAsMarkdown, exportNote, toggleHideFromCapture, toggleAutoSizing
+        case setSpaceAssignment, toggleKeepOnTop, toggleFooterCount, duplicateNote, requestDeleted
+        case restoreDeleted, forgetDeleted, textSize, navigate, dragRegions, headingMenu
+    }
 
-        switch type {
-        case "ready":
-            self = .ready
-        case "edited":
-            self = .edited(text: string("text"), caret: Int(number("caret")))
-        case "caret":
-            self = .caret(caret: Int(number("caret")), scrollLine: Int(number("scrollLine")))
-        case "requestNotes":
-            self = .requestNotes(query: string("query"))
-        case "openNote":
-            self = .openNote(filename: string("filename"))
-        case "createNote":
-            self = .createNote(title: string("title"))
-        case "togglePin":
-            self = .togglePin(filename: dict["filename"] as? String)
-        case "deleteNote":
-            self = .deleteNote(filename: string("filename"))
-        case "close":
-            self = .close
-        case "contentHeight":
-            self = .contentHeight(CGFloat(number("height")))
-        case "switcherOpen":
-            self = .switcherOpen(
-                open: dict["open"] as? Bool ?? false,
-                height: CGFloat(number("height"))
-            )
-        case "actionsOpen":
-            self = .actionsOpen(
-                open: dict["open"] as? Bool ?? false,
-                height: CGFloat(number("height"))
-            )
-        case "revealInFinder":
-            self = .revealInFinder
-        case "openLink":
-            self = .openLink(target: string("target"))
-        case "renameFile":
-            self = .renameFile
-        case "copyAsMarkdown":
-            self = .copyAsMarkdown(text: string("text"))
-        case "exportNote":
-            self = .exportNote(text: string("text"))
-        case "toggleHideFromCapture":
-            self = .toggleHideFromCapture
-        case "toggleAutoSizing":
-            self = .toggleAutoSizing
-        case "setSpaceAssignment":
-            self = .setSpaceAssignment(string("mode"))
-        case "toggleKeepOnTop":
-            self = .toggleKeepOnTop
-        case "toggleFooterCount":
-            self = .toggleFooterCount
-        case "duplicateNote":
-            self = .duplicateNote(text: string("text"))
-        case "requestDeleted":
-            self = .requestDeleted
-        case "restoreDeleted":
-            self = .restoreDeleted(storedName: string("storedName"))
-        case "forgetDeleted":
-            self = .forgetDeleted(storedName: string("storedName"))
-        case "textSize":
-            self = .textSize(action: string("action"))
-        case "navigate":
-            self = .navigate(back: dict["back"] as? Bool ?? true)
-        case "openSettings":
-            self = .openSettings
-        case "dragRegions":
-            self = .dragRegions(
-                titleBar: Self.rect(dict["titleBar"]),
-                exclusions: (dict["exclusions"] as? [Any] ?? []).map(Self.rect),
-                close: Self.rect(dict["close"])
-            )
-        case "headingMenu":
-            self = .headingMenu(
-                button: Self.rect(dict["button"]),
-                level: (dict["level"] as? NSNumber)?.intValue
-            )
-        default:
-            return nil
+    public static var knownTypes: Set<String> { Set(Kind.allCases.map(\.rawValue)) }
+
+    /// Which `type` this message was decoded from. Exhaustive, so it also proves every `Kind` has a
+    /// case to land in.
+    public var kind: Kind {
+        switch self {
+        case .ready: .ready
+        case .edited: .edited
+        case .caret: .caret
+        case .requestNotes: .requestNotes
+        case .openNote: .openNote
+        case .createNote: .createNote
+        case .togglePin: .togglePin
+        case .deleteNote: .deleteNote
+        case .close: .close
+        case .contentHeight: .contentHeight
+        case .switcherOpen: .switcherOpen
+        case .actionsOpen: .actionsOpen
+        case .revealInFinder: .revealInFinder
+        case .openLink: .openLink
+        case .renameFile: .renameFile
+        case .openSettings: .openSettings
+        case .copyAsMarkdown: .copyAsMarkdown
+        case .exportNote: .exportNote
+        case .toggleHideFromCapture: .toggleHideFromCapture
+        case .toggleAutoSizing: .toggleAutoSizing
+        case .setSpaceAssignment: .setSpaceAssignment
+        case .toggleKeepOnTop: .toggleKeepOnTop
+        case .toggleFooterCount: .toggleFooterCount
+        case .duplicateNote: .duplicateNote
+        case .requestDeleted: .requestDeleted
+        case .restoreDeleted: .restoreDeleted
+        case .forgetDeleted: .forgetDeleted
+        case .textSize: .textSize
+        case .navigate: .navigate
+        case .dragRegions: .dragRegions
+        case .headingMenu: .headingMenu
         }
     }
 
-    private static func rect(_ any: Any?) -> CGRect {
-        guard let r = any as? [String: Any] else { return .zero }
-        return CGRect(
-            x: (r["x"] as? NSNumber)?.doubleValue ?? 0,
-            y: (r["y"] as? NSNumber)?.doubleValue ?? 0,
-            width: (r["width"] as? NSNumber)?.doubleValue ?? 0,
-            height: (r["height"] as? NSNumber)?.doubleValue ?? 0
-        )
+    // MARK: - Decoding
+
+    /// From what `WKScriptMessage.body` carries: a property list of strings, numbers, booleans,
+    /// arrays and dictionaries. Anything that is not a message, or not one Plume knows, is nil.
+    public init?(body: Any) {
+        guard JSONSerialization.isValidJSONObject(body),
+              let data = try? JSONSerialization.data(withJSONObject: body),
+              let decoded = try? JSONDecoder().decode(BridgeMessage.self, from: data)
+        else { return nil }
+        self = decoded
+    }
+
+    private enum Key: String, CodingKey {
+        case type
+        case text, caret, scrollLine, query, filename, title, height, open, target, mode
+        case storedName, action, back, titleBar, exclusions, close, button, level
+    }
+
+    private struct Frame: Decodable {
+        var x = 0.0, y = 0.0, width = 0.0, height = 0.0
+        var rect: CGRect { CGRect(x: x, y: y, width: width, height: height) }
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: Axis.self)
+            x = (try? c.decodeIfPresent(Double.self, forKey: .x)) ?? 0
+            y = (try? c.decodeIfPresent(Double.self, forKey: .y)) ?? 0
+            width = (try? c.decodeIfPresent(Double.self, forKey: .width)) ?? 0
+            height = (try? c.decodeIfPresent(Double.self, forKey: .height)) ?? 0
+        }
+        private enum Axis: String, CodingKey { case x, y, width, height }
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: Key.self)
+        guard let kind = Kind(rawValue: try c.decode(String.self, forKey: .type)) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .type, in: c, debugDescription: "unknown message type"
+            )
+        }
+
+        func string(_ key: Key) -> String { (try? c.decodeIfPresent(String.self, forKey: key)) ?? "" }
+        func number(_ key: Key) -> Double { (try? c.decodeIfPresent(Double.self, forKey: key)) ?? 0 }
+        func flag(_ key: Key, default fallback: Bool) -> Bool {
+            (try? c.decodeIfPresent(Bool.self, forKey: key)) ?? fallback
+        }
+        func frame(_ key: Key) -> CGRect { ((try? c.decodeIfPresent(Frame.self, forKey: key)) ?? nil)?.rect ?? .zero }
+
+        switch kind {
+        case .ready: self = .ready
+        case .edited: self = .edited(text: string(.text), caret: Int(number(.caret)))
+        case .caret: self = .caret(caret: Int(number(.caret)), scrollLine: Int(number(.scrollLine)))
+        case .requestNotes: self = .requestNotes(query: string(.query))
+        case .openNote: self = .openNote(filename: string(.filename))
+        case .createNote: self = .createNote(title: string(.title))
+        case .togglePin: self = .togglePin(filename: (try? c.decodeIfPresent(String.self, forKey: .filename)) ?? nil)
+        case .deleteNote: self = .deleteNote(filename: string(.filename))
+        case .close: self = .close
+        case .contentHeight: self = .contentHeight(CGFloat(number(.height)))
+        case .switcherOpen: self = .switcherOpen(open: flag(.open, default: false), height: CGFloat(number(.height)))
+        case .actionsOpen: self = .actionsOpen(open: flag(.open, default: false), height: CGFloat(number(.height)))
+        case .revealInFinder: self = .revealInFinder
+        case .openLink: self = .openLink(target: string(.target))
+        case .renameFile: self = .renameFile
+        case .openSettings: self = .openSettings
+        case .copyAsMarkdown: self = .copyAsMarkdown(text: string(.text))
+        case .exportNote: self = .exportNote(text: string(.text))
+        case .toggleHideFromCapture: self = .toggleHideFromCapture
+        case .toggleAutoSizing: self = .toggleAutoSizing
+        case .setSpaceAssignment: self = .setSpaceAssignment(string(.mode))
+        case .toggleKeepOnTop: self = .toggleKeepOnTop
+        case .toggleFooterCount: self = .toggleFooterCount
+        case .duplicateNote: self = .duplicateNote(text: string(.text))
+        case .requestDeleted: self = .requestDeleted
+        case .restoreDeleted: self = .restoreDeleted(storedName: string(.storedName))
+        case .forgetDeleted: self = .forgetDeleted(storedName: string(.storedName))
+        case .textSize: self = .textSize(action: string(.action))
+        case .navigate: self = .navigate(back: flag(.back, default: true))
+        case .dragRegions:
+            let list = ((try? c.decodeIfPresent([Frame].self, forKey: .exclusions)) ?? nil) ?? []
+            self = .dragRegions(titleBar: frame(.titleBar), exclusions: list.map(\.rect), close: frame(.close))
+        case .headingMenu:
+            self = .headingMenu(
+                button: frame(.button),
+                level: ((try? c.decodeIfPresent(Double.self, forKey: .level)) ?? nil).map { Int($0) }
+            )
+        }
     }
 }
