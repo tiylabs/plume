@@ -29,7 +29,7 @@ import { DEFAULT_SHORTCUTS, keyCaps, matchesBinding } from "./editor/shortcuts";
 import { send } from "./bridge/send";
 import { createHost } from "./bridge/host";
 import type { HostAPI } from "./bridge/protocol";
-import { actionsEl, bannerEl, closeEl, editorHost, panelEl, switcherEl } from "./editor/dom";
+import { actionsEl, bannerEl, closeEl, editorHost, mountThemeStyle, panelEl, switcherEl } from "./editor/dom";
 import { ctx } from "./editor/ctx";
 import { state } from "./editor/state";
 import {
@@ -200,6 +200,8 @@ document.addEventListener(
 // ---------------------------------------------------------------------------------------------
 // Inbound — everything Swift can ask the web layer to do
 // ---------------------------------------------------------------------------------------------
+
+mountThemeStyle();
 
 const host = createHost({
   view,

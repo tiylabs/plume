@@ -20,7 +20,11 @@ export const actionsEl = byId("actions");
 export const switcherEl = byId("switcher");
 
 /// Where a user's markdown theme lands (decision 19). Appended last so it wins the cascade against
-/// the bundled stylesheets without needing !important.
+/// the bundled stylesheets without needing !important. Created here but not attached: module top
+/// levels have no side effects except `main.ts`, so `main.ts` calls `mountThemeStyle`.
 export const themeStyleEl = document.createElement("style");
 themeStyleEl.id = "markdown-theme";
-document.head.appendChild(themeStyleEl);
+
+export function mountThemeStyle(): void {
+  document.head.appendChild(themeStyleEl);
+}
