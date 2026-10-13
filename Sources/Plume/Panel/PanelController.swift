@@ -11,49 +11,6 @@ import PlumeKit
 @MainActor
 final class PanelController: NSObject {
 
-    /// What the panel is telling the user about itself, in one line above the editor.
-    ///
-    /// The design record never drew any of these (the brief says so out loud), so they are built here
-    /// against decision 22's chrome rules: one row, no button that has to be dismissed before typing
-    /// resumes, and nothing that looks like an error — because in two of the three cases nothing
-    /// went wrong.
-    enum Banner {
-        case conflict
-        case downloading
-        case problem(String)
-
-        var kind: String {
-            switch self {
-            case .conflict: return "conflict"
-            case .downloading: return "downloading"
-            case .problem: return "problem"
-            }
-        }
-
-        var text: String {
-            switch self {
-            case .conflict:
-                // Decision 76: the name of the thing that happened, and nothing after it.
-                //
-                // This used to go on to print the sibling's filename, and **the filename was the
-                // half that got cut**: decision 2's names are long by construction and the conflict
-                // stamp doubles them, so a 434pt panel rendered "…Your version is in
-                // 2026-08-23-1002…" — all of the prose and none of the payload. Seen the first time
-                // the banner ever fired for real.
-                //
-                // Nothing is lost by dropping it. The panel is already editing the sibling
-                // (decision 25), so your text is on screen; ⌥⌘R reveals the file it is in; and the
-                // switcher lists both. A row that cannot fit the fact it is carrying is better off
-                // carrying the state instead.
-                return tr("banner.conflict")
-            case .downloading:
-                return tr("banner.downloading")
-            case .problem(let message):
-                return message
-            }
-        }
-    }
-
     let panel = PanelWindow()
     let editor = EditorWebView(frame: .zero)
 
@@ -1062,7 +1019,7 @@ final class PanelController: NSObject {
 
         // Back and Forward hold filenames, so an un-rewritten entry is a ⌘[ onto a file that no
         // longer exists — which `open` would then treat as a missing note and drop from state.
-        for index in history.indices where history[index] == old { history[index] = new }
+        history.rename(old, to: new)
 
         // The web layer is told for the same reason the conflict path tells it: `loadNote` is the
         // only other thing that sets this, and this path must not reload (it would move the caret).
@@ -1410,43 +1367,21 @@ final class PanelController: NSObject {
 
     // MARK: - History
 
-    /// Notes visited in this panel, oldest first; `historyIndex` points at the one on screen.
-    ///
-    /// ⌘[ and ⌘] are the reference's keys, verified on the running app — it carries the feature but
-    /// exposes no ⌘K row for it, so Plume does the same and decision 17's panel stays at fourteen.
-    ///
-    /// In memory rather than in `state.json`: this describes one sitting with the app, and a Back
-    /// that reaches across a relaunch into notes you have forgotten visiting is a worse answer than
-    /// one that starts fresh. It is also the reason there is no schema change here.
-    private var history: [String] = []
-    private var historyIndex = -1
+    /// Notes visited in this panel — see `NavigationHistory`. ⌘[ and ⌘] are the reference's keys,
+    /// verified on the running app: it carries the feature but exposes no ⌘K row for it, so Plume
+    /// does the same.
+    private var history = NavigationHistory()
 
-    /// Long enough that Back never runs out in a real session, short enough to stay a rounding error
-    /// in a process that runs for weeks.
-    private static let historyLimit = 50
-
-    private func recordVisit(_ filename: String) {
-        // Opening something new from the middle of the history discards what was ahead, exactly as a
-        // browser does: those entries describe a future that has now not happened.
-        if historyIndex >= 0, historyIndex < history.count - 1 {
-            history.removeSubrange((historyIndex + 1)...)
-        }
-        guard history.last != filename else { return }
-        history.append(filename)
-        if history.count > Self.historyLimit { history.removeFirst(history.count - Self.historyLimit) }
-        historyIndex = history.count - 1
-    }
+    private func recordVisit(_ filename: String) { history.recordVisit(filename) }
 
     func goBack() {
-        guard historyIndex > 0 else { return }
-        historyIndex -= 1
-        open(history[historyIndex], recordingHistory: false)
+        guard let filename = history.back() else { return }
+        open(filename, recordingHistory: false)
     }
 
     func goForward() {
-        guard historyIndex >= 0, historyIndex < history.count - 1 else { return }
-        historyIndex += 1
-        open(history[historyIndex], recordingHistory: false)
+        guard let filename = history.forward() else { return }
+        open(filename, recordingHistory: false)
     }
 
     func openSwitcher() {

@@ -32,6 +32,7 @@ runLocalizationTests()
 runCompatibilityTests()
 runBridgeContractTests()
 runStoreTests()
+runNavigationHistoryTests()
 runVaultServiceTests()
 
 exit(Check.finish())
