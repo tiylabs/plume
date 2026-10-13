@@ -7,8 +7,8 @@
 
 import { EditorState, EditorSelection } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { plumeDialect } from "../../src/dialect";
-import { arrivedByEditAfter, revealPolicy } from "../../src/reveal";
+import { plumeDialect } from "../../src/markdown/dialect";
+import { arrivedByEditAfter, revealPolicy } from "../../src/markdown/reveal";
 import type { Case } from "./harness";
 
 function stateWithSelection(doc: string): EditorState {

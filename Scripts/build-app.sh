@@ -108,8 +108,8 @@ cp -R "$ROOT/Editor/dist/." "$CONTENTS/Resources/Editor/"
 # Static bundle resources — currently the menu bar template images. Flat rather than in a
 # subdirectory because `NSImage(named:)` only searches the top level of Resources, and going through
 # a subdirectory would mean loading them by path and losing the automatic @2x/@3x selection.
-if [[ -d "$ROOT/Resources" ]]; then
-	cp -R "$ROOT/Resources/." "$CONTENTS/Resources/"
+if [[ -d "$ROOT/App/Resources" ]]; then
+	cp -R "$ROOT/App/Resources/." "$CONTENTS/Resources/"
 fi
 
 # MIT requires the copyright and permission notice to travel with every copy, binaries included —
@@ -125,7 +125,7 @@ if [[ -d "$ROOT/Themes" ]]; then
 fi
 
 # The interface languages (Locales/<code>/strings.json + welcome.md). Copied whole, so a new language
-# directory ships with no edit here. The Swift side reads them at runtime (PlumeKit/Localization.swift)
+# directory ships with no edit here. The Swift side reads them at runtime (PlumeKit/Support/L10n.swift)
 # and the web bundle has already inlined its `editor.*` half at build time.
 if [[ -d "$ROOT/Locales" ]]; then
 	mkdir -p "$CONTENTS/Resources/Locales"
@@ -134,7 +134,7 @@ if [[ -d "$ROOT/Locales" ]]; then
 fi
 
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" \
-	"$ROOT/Scripts/Info.plist" > "$CONTENTS/Info.plist"
+	"$ROOT/App/Info.plist" > "$CONTENTS/Info.plist"
 
 # Declare every shipped language in Info.plist, discovered from the same directories.
 #
@@ -163,8 +163,8 @@ fi
 
 printf 'APPL????' > "$CONTENTS/PkgInfo"
 
-ICON="$ROOT/Scripts/AppIcon.icns"
-[[ "$CHANNEL" == "dev" ]] && ICON="$ROOT/Scripts/AppIcon-dev.icns"
+ICON="$ROOT/App/AppIcon.icns"
+[[ "$CHANNEL" == "dev" ]] && ICON="$ROOT/App/AppIcon-dev.icns"
 if [[ -f "$ICON" ]]; then
 	cp "$ICON" "$CONTENTS/Resources/AppIcon.icns"
 	/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$CONTENTS/Info.plist" >/dev/null

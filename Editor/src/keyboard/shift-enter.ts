@@ -16,7 +16,7 @@ import type { SyntaxNode } from "@lezer/common";
 import type { LineContext } from "./context";
 import { delegateWhen, FENCE_OPENING, keyCommand } from "./context";
 import { chain, rows, type KeyEdit } from "./edit";
-import { fencesOf } from "../blocks";
+import { fencesOf } from "../markdown/blocks";
 import { continueMarkup, exitEmptyBlockquote, exitListToParagraph } from "./enter";
 
 const INPUT = "input";

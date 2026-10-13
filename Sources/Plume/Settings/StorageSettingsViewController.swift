@@ -74,7 +74,7 @@ final class StorageSettingsViewController: NSViewController {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    /// `~/Library/Mobile Documents/com~apple~CloudDocs/Plume` — or `…/Plume-scratch` in a debug build.
+    /// `~/Library/Mobile Documents/com~apple~CloudDocs/Plume` — or `…/Plume-dev` in a debug build.
     ///
     /// Built from the literal container name rather than from `url(forUbiquityContainerIdentifier:)`,
     /// which decision 13 measured returning nil here: unsigned means no ubiquity entitlement. The
@@ -347,7 +347,7 @@ final class StorageSettingsViewController: NSViewController {
         alert.alertStyle = .informational
         alert.addButton(withTitle: tr("storage.git.enable"))
         alert.addButton(withTitle: tr("common.cancel"))
-        guard PlumePanel.steppingAside({ alert.runModal() }) == .alertFirstButtonReturn else { return }
+        guard PanelWindow.steppingAside({ alert.runModal() }) == .alertFirstButtonReturn else { return }
 
         settings.update { $0.gitSync = GitSyncSettings(enabled: true, remoteURL: address, branch: branch) }
         refresh(settings.value)
@@ -371,7 +371,7 @@ final class StorageSettingsViewController: NSViewController {
         alert.alertStyle = .informational
         alert.addButton(withTitle: tr("storage.git.stop"))
         alert.addButton(withTitle: tr("common.cancel"))
-        return PlumePanel.steppingAside { alert.runModal() } == .alertFirstButtonReturn
+        return PanelWindow.steppingAside { alert.runModal() } == .alertFirstButtonReturn
     }
 
     // MARK: - Actions
@@ -391,7 +391,7 @@ final class StorageSettingsViewController: NSViewController {
         panel.message = tr("folderPanel.message")
         panel.directoryURL = settings.value.vaultURL
 
-        guard PlumePanel.steppingAside({ panel.runModal() }) == .OK, let chosen = panel.url else { return }
+        guard PanelWindow.steppingAside({ panel.runModal() }) == .OK, let chosen = panel.url else { return }
         // Picking a folder by hand is a statement about where the notes already are, so nothing
         // moves — unlike the Sync radio, which is a statement about where they should be.
         adopt(chosen, movingNotes: false)
@@ -408,7 +408,7 @@ final class StorageSettingsViewController: NSViewController {
                 alert.messageText = tr("storage.git.icloud.title")
                 alert.informativeText = tr("storage.git.icloud.detail")
                 alert.alertStyle = .warning
-                _ = PlumePanel.steppingAside { alert.runModal() }
+                _ = PanelWindow.steppingAside { alert.runModal() }
                 refresh(current)
                 return
             }
@@ -471,7 +471,7 @@ final class StorageSettingsViewController: NSViewController {
         alert.addButton(withTitle: noteCount > 0 ? tr("storage.move.leave") : tr("common.continue"))
         alert.addButton(withTitle: tr("common.cancel"))
 
-        let response = PlumePanel.steppingAside { alert.runModal() }
+        let response = PanelWindow.steppingAside { alert.runModal() }
         let cancel: NSApplication.ModalResponse = noteCount > 0 ? .alertThirdButtonReturn : .alertSecondButtonReturn
         guard response != cancel else {
             refresh(settings.value)  // put the pop-up back where it was
@@ -510,7 +510,7 @@ final class StorageSettingsViewController: NSViewController {
             alert.messageText = tr("storage.useFailed")
             alert.informativeText = error.localizedDescription
             alert.alertStyle = .warning
-            _ = PlumePanel.steppingAside { alert.runModal() }
+            _ = PanelWindow.steppingAside { alert.runModal() }
             refresh(settings.value)
             return
         }

@@ -12,8 +12,9 @@ $(EDITOR_DIR)/node_modules: $(EDITOR_DIR)/package-lock.json
 	cd $(EDITOR_DIR) && npm ci
 	@touch $@
 
-lint: $(EDITOR_DIR)/node_modules ## Typecheck the editor (tsc) and run SwiftLint if installed
+lint: $(EDITOR_DIR)/node_modules ## Typecheck the editor (tsc), check doc references, run SwiftLint if installed
 	cd $(EDITOR_DIR) && npm run --silent typecheck
+	Scripts/check-doc-refs.sh
 	@if command -v swiftlint >/dev/null 2>&1; then swiftlint lint --quiet; \
 	else echo "swiftlint not installed, skipping (brew install swiftlint)"; fi
 
@@ -24,7 +25,7 @@ test-all: $(EDITOR_DIR)/node_modules ## Run every suite: PlumeKit, typecheck, ke
 	Scripts/test-all.sh
 
 dev: $(EDITOR_DIR)/node_modules ## Rebuild the isolated Plume Dev.app without stopping the release app
-	swift Scripts/dev-app.swift stop "$(CURDIR)/$(DEV_APP)" "$(CURDIR)/build/Plume.app"
+	swift Scripts/tools/dev-app.swift stop "$(CURDIR)/$(DEV_APP)" "$(CURDIR)/build/Plume.app"
 	Scripts/build-app.sh --debug
 	open "$(CURDIR)/$(DEV_APP)"
 
@@ -34,13 +35,5 @@ build: $(EDITOR_DIR)/node_modules ## Release build of build/Plume.app (host arch
 editor: $(EDITOR_DIR)/node_modules ## Rebuild only the web editor bundle
 	cd $(EDITOR_DIR) && node build.mjs
 
-clean: ## Remove build outputs while preserving build/Plume-scratch notes
-	rm -rf .build $(EDITOR_DIR)/dist
-	@if [ -L build ]; then rm build; \
-	elif [ -d build ]; then \
-		for path in build/* build/.[!.]* build/..?*; do \
-			[ "$$path" = "build/Plume-scratch" ] && continue; \
-			[ -e "$$path" ] || [ -L "$$path" ] || continue; \
-			rm -rf "$$path" || exit $$?; \
-		done; \
-	fi
+clean: ## Remove build outputs
+	rm -rf .build build $(EDITOR_DIR)/dist

@@ -19,7 +19,7 @@ import { insertNewlineContinueMarkupCommand } from "@codemirror/lang-markdown";
 import type { LineContext } from "./context";
 import { keyCommand } from "./context";
 import { chain, rows, type KeyEdit } from "./edit";
-import { markerSpanEnd } from "../blocks";
+import { markerSpanEnd } from "../markdown/blocks";
 
 const INPUT = "input";
 

@@ -18,7 +18,7 @@
  *   ⇥  writes nothing in a heading, a quote or a paragraph; in code, spaces at the caret (179)
  */
 
-import { indentEdit, outdentEdit } from "../list-indent";
+import { indentEdit, outdentEdit } from "../markdown/list-indent";
 import type { LineContext } from "./context";
 import { NOOP, type KeyEdit } from "./edit";
 

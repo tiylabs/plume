@@ -6,8 +6,8 @@ import PackageDescription
 // assembles the .app around the binary.
 //
 // The split is deliberate. PlumeKit holds everything that is pure Foundation — filenames, hashing,
-// the write model, the vault watcher, state persistence, geometry arithmetic, switcher ordering — so
-// it can be unit-tested without a window server. Plume holds only what genuinely needs AppKit, WebKit
+// the write model, the note session, the bridge message types, the vault watcher, state persistence,
+// Git sync, geometry arithmetic, switcher ordering — so it can be unit-tested without a window server. Plume holds only what genuinely needs AppKit, WebKit
 // or Carbon.
 let package = Package(
     name: "Plume",
@@ -19,11 +19,13 @@ let package = Package(
     targets: [
         .target(name: "PlumeKit"),
         .executableTarget(name: "Plume", dependencies: ["PlumeKit"]),
-        .executableTarget(name: "DockSpaceProbe", dependencies: ["PlumeKit"], path: "Tools/DockSpaceProbe"),
+        .executableTarget(name: "DockSpaceProbe", dependencies: ["PlumeKit"], path: "Sources/DockSpaceProbe"),
 
         // Not a .testTarget: neither XCTest nor swift-testing ships with the Command Line Tools, so
         // `swift test` cannot run without Xcode installed. The suite is an executable instead —
         // `Scripts/test.sh` — which runs anywhere `swift build` does.
-        .executableTarget(name: "PlumeKitTests", dependencies: ["PlumeKit"]),
+        .executableTarget(
+            name: "PlumeKitTests", dependencies: ["PlumeKit"], path: "Tests/PlumeKitTests", exclude: ["Fixtures"]
+        ),
     ]
 )

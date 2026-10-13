@@ -43,7 +43,7 @@ let projectRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 let debugApp = projectRoot.appendingPathComponent("build/Plume Dev.app").standardizedFileURL.path
 let support = NSHomeDirectory() + "/Library/Application Support/Plume (Debug)"
 let settings = try! JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: support + "/settings.json"))) as! [String: Any]
-let defaultVault = projectRoot.appendingPathComponent("build/Plume-scratch").path
+let defaultVault = NSHomeDirectory() + "/Documents/Plume-dev"
 let vault = NSString(string: (settings["vaultPath"] as? String) ?? defaultVault).expandingTildeInPath
 let recentlyDeleted = support + "/Recently Deleted"
 

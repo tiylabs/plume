@@ -5,7 +5,7 @@
  * New York is macOS's own serif and ships with the system, so this needs no font file and falls back
  * through Iowan and Georgia on anything that somehow lacks it.
  *
- * A theme is a CSS file in this folder (decision 19) — copy it, rename it, edit it. Anything in the
+ * A theme is a CSS file in this folder — copy it, rename it, edit it. Anything in the
  * panel can be restyled from here, but note what this file deliberately does NOT do: it never sets
  * `--font-ui` or any other token on `:root`. Those carry the chrome as well as the note — the
  * footer, the switcher, ⌘K — and a theme that reaches them restyles the application rather than the
