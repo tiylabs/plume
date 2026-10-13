@@ -29,5 +29,6 @@ runGitSyncRepositoryTests()
 runLocalizationTests()
 runCompatibilityTests()
 runStoreTests()
+runVaultServiceTests()
 
 exit(Check.finish())

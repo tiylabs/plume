@@ -57,7 +57,7 @@ final class PanelController: NSObject {
     let panel = PanelWindow()
     let editor = EditorWebView(frame: .zero)
 
-    private let vault: VaultService
+    private let vault: any VaultServicing
     private let state: StateStore
     private let settings: SettingsStore
 
@@ -174,7 +174,7 @@ final class PanelController: NSObject {
     /// two overlays did differently.
     private var switcherPanelHeight: CGFloat = 0
 
-    init(vault: VaultService, state: StateStore, settings: SettingsStore) {
+    init(vault: any VaultServicing, state: StateStore, settings: SettingsStore) {
         self.vault = vault
         self.state = state
         self.settings = settings
