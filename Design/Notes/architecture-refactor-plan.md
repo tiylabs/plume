@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 状态 | 草案 v2（已纳入维护者的 4 项决定） |
+| 状态 | 阶段 0–3 已实施；阶段 4 待开始 |
 | 日期 | 2026-10-13 |
 | 基线提交 | `2a1c8ff`（master） |
 | 范围 | 模块划分、项目架构、目录结构、命名规范、工程护栏 |
@@ -607,10 +607,39 @@ Design/
 - 验收：手工删掉 TS 侧任意一个消息类型，或者把 Swift 侧某个字段名改错，`Scripts/test.sh` 都会变红；`grep -rn 'call("' Sources/Plume` 为空。
 
 ### 8.4 阶段 3 验收
-- [ ] `Sources/Plume` 中没有只 import Foundation 的文件（检查脚本见附录 B）
-- [ ] PlumeKit 新增测试覆盖 Persistence、VaultService、ReleaseFetcher、GitSyncScheduler、Bridge
-- [ ] 桥接契约测试生效（两种手工破坏方式都会被发现）
-- [ ] 断言总数比基线有明显增加（记录新增数量）
+- [x] `Sources/Plume` 中没有只 import Foundation 的文件（2026-10-13 实测为 0；`Services/` 里只剩 `GlobalHotkey` 和 80 行以内的 `GitSyncController` 外壳）
+- [x] PlumeKit 新增测试覆盖 Persistence（`StoreTests`）、VaultService（`VaultServiceTests`）、ReleaseFetcher（`ReleaseFetcherTests`）、GitSyncScheduler（`GitSyncSchedulerTests`）、Bridge（`BridgeContractTests`）
+- [x] 桥接契约测试生效：两种手工破坏方式都会被发现（见下面"实施记录"的变异清单）
+- [x] 断言总数比基线有明显增加：PlumeKit 从 2987 增至 3301（+314），测试从 456 增至 528（+72）；WKWebView 套件 1419 不变
+
+#### 实施记录（与方案的差异）
+
+- **PR 3.1**：`Scheduling` 协议多了一个 `repeating(every:tolerance:)`，因为 Git 同步的 5 分钟周期原来是 `Timer`，不能用链式 `asyncAfter` 代替（`Timer` 按墙钟走，睡眠期间到期的会在唤醒时触发；dispatch 时钟睡眠时停表）。`ManualScheduler` 放在测试 target（`Tests/PlumeKitTests/Support/`），没有进入发布二进制。`SettingsStore` 额外接受 `profile`、`bundleURL`、`homeDirectory`，开发版隔离和旧库迁移因此可测。测试 harness 增加了 `Check.mainSuite` / `Check.mainTest`，只给被测对象是 `@MainActor` 的测试用，普通测试的闭包不变。
+- **PR 3.2**：`VaultService` 的 5 个内嵌结果类型提到了顶层并加 `Vault` 前缀（`VaultSnapshot`、`VaultLoadResult`、`VaultDiskState`、`VaultWriteResult`、`VaultRenameResult`），放在 `VaultResults.swift`。协议只列 `PanelController` 实际调用的方法，不含 `drain`、`purgeDeleted`、`titles`、`present`（`AppDelegate` 直接用具体类型）；`present` 在计划里列了，但 `PanelController` 并不调用它，所以没有放进协议。`init` 增加了 `deletedStore:` 参数，让测试不碰真实的 Application Support。`writeDelayForTesting` 是一个测试钩子，默认 0；没有它，"delete 逃出串行队列"的变异测不出来。
+- **PR 3.3**：`HTTPFetching` 只返回 `(Data?, Error?)`，没有响应对象，因为 Plume 唯一的请求把所有失败当成同一种（`.unknown`）。
+- **PR 3.4**：`GitSyncScheduler` 的 `init` 不给默认参数（默认参数在 actor 外求值，而 `MainQueueScheduler` 等是 `@MainActor`）。`swift build` 不报这个错，`Scripts/test-dev-isolation.sh` 里用 bare `swiftc` 编译 PlumeKit 才报，已修。`GitSyncEngineRunner` 的串行队列是静态的，旧目标和新目标不会同时对同一个目录跑 Git。`GitSyncController` 由 255 行降到 42 行。
+- **PR 3.5**：计划里的"`BridgeMessage` 改为 `Decodable`"已做；解码保持原来的宽松语义（缺字段读作零值，`navigate.back` 缺省为 `true`，未知 `type` 丢弃）。`EditorCommand.encodedArguments()` 返回逐个 JSON 字符串；JSON 编码与旧的 `JSONSerialization` 路径逐字一致（包括把 `/` 转义为 `\/`、U+2028、`</script>`），这一点是单独比对过的，因为计划原则 1 要求行为不变。`HostAPI` 里的类型（`NoteSummary`、`SpaceAssignmentState`、`DockSpaceAssignmentState`、`PanelSettings`）从 `switcher.ts`、`action-panel.ts`、`main.ts` 移到了 `bridge/protocol.ts`。`Editor/tests/bridge-names.{mjs,txt}` 已删除，契约测试取代了它。
+
+##### 契约测试的变异验证（2026-10-13）
+
+| 破坏方式 | 被谁发现 |
+|---|---|
+| TS 侧删掉 `toggleFooterCount` 消息 | `BridgeContractTests`：Swift 解码的类型集合与页面不一致 |
+| TS 侧删掉 `hideBanner` 方法 | 同上：`EditorCommand` 与 `HostAPI` 的方法集合不一致，且 `main.ts` 的 `tsc` 也会失败 |
+| TS 侧给 `setPointer` 多加一个参数 | 参数个数检查 |
+| Swift 侧 `setPointer` 少传一个参数 | 参数个数检查 |
+| Swift 侧把方法名拼错 | 方法集合检查 + 参数个数检查 |
+| Swift 侧把 `scrollLine` 读成别的键名 | "页面发送的每个字段都被读取" |
+| Swift 侧忽略 `navigate.back` | 同上 |
+| Swift 侧改了 `applySettings` 的某个键名 | `applySettings` 键集合与 `PanelSettings` 不一致 |
+
+另有 StateStore（去掉合并窗口的重置）、VaultService（delete 逃出串行队列、冲突检测关掉）、GitSyncScheduler（5 种）的变异检查，都被对应测试发现。
+
+##### 运行时验证
+
+用真实打包的 `Editor/dist/index.html` 在真实 WKWebView 里，把 23 个 `EditorCommand` 的 `script` 逐个执行，包含含反引号、`</script>`、U+2028、emoji、`${x}` 的文本：无 JS 异常，文档内容、标题、置顶、保持置顶、外观、字号、强调色、悬停状态都按预期落在 DOM 上。**这不能替代附录 D 的手工清单和 smoke t1**，那两项依赖运行中的开发版，仍需要你执行。
+
+---
 
 ---
 
@@ -1045,6 +1074,23 @@ git ls-files 'Design/*.png' | wc -l
 | B3 "plume 表示面板"残留（Swift） | 93 | 0 | 0 |
 | PlumeKit 测试 | 约 456 个测试（推算：阶段 0 记录的 461 减去 PR 0.4 新增的 5 个，未实测）/ 断言数未记录 | 463 个测试 / 3014 断言 | ≥ 此值 |
 | WKWebView 套件断言 | 1419 | 1419 | ≥ 此值 |
+| `@unchecked Sendable` | 7 | 7 | L4 目标为 0 |
+
+### 阶段 3 结束时的度量（2026-10-13，`refactor/architecture` 分支）
+
+| 指标 | 阶段 2 结束 | 阶段 3 结束 | 阶段 4 目标 |
+|---|---|---|---|
+| `GitSyncController.swift` | 255 | 42 | ≤ 80 |
+| `EditorWebView.swift` | 501 | 460 | ≤ 400 |
+| `PanelController.swift` | 2092 | 2076（`call("…")` 换成 `send(.…)`） | ≤ 600 |
+| `AppDelegate.swift` | 683 | 683 | ≤ 250 |
+| Swift 代码量：Plume / PlumeKit / Tests | 8243 / 6284 / 5568 | 7019 / 8007 / 6733 | Plume 继续下降 |
+| App target 中只 import Foundation 的文件 | 2 | 0 | 0 |
+| `editor.call("…")` 调用点 | 约 45 | 0 | 0 |
+| 未受检的桥接名称 | 0（`bridge-names.mjs`） | 0（`BridgeContractTests`，名称、参数个数、字段） | 0 |
+| PlumeKit 测试 | 463 个测试 / 3014 断言 | 528 个测试 / 3301 断言 | ≥ 此值 |
+| WKWebView 套件断言 | 1419 | 1419 | ≥ 此值 |
+| 未公开文档引用 | 746 | 746（新增的文件没有引入新引用） | 明显下降，L2 清零 |
 | `@unchecked Sendable` | 7 | 7 | L4 目标为 0 |
 
 ---
