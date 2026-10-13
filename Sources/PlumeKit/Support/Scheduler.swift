@@ -16,6 +16,13 @@ public protocol Scheduling {
     /// Calls `work` once, `delay` seconds from now, unless the returned token is cancelled first.
     @discardableResult
     func schedule(after delay: TimeInterval, _ work: @escaping @MainActor () -> Void) -> any Cancellable
+
+    /// Calls `work` every `interval` seconds until the returned token is cancelled. `tolerance` is
+    /// how late the system may run it to save power; it is a hint, and a manual clock ignores it.
+    @discardableResult
+    func repeating(
+        every interval: TimeInterval, tolerance: TimeInterval, _ work: @escaping @MainActor () -> Void
+    ) -> any Cancellable
 }
 
 /// The real thing: the main dispatch queue.
@@ -29,6 +36,29 @@ public struct MainQueueScheduler: Scheduling {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
         return WorkItemToken(item)
     }
+}
+
+extension MainQueueScheduler {
+
+    /// A run-loop `Timer` rather than a chain of `asyncAfter`s, on purpose: a timer is measured
+    /// against the wall clock, so one that came due while the Mac slept fires on wake, whereas the
+    /// dispatch clock stops during sleep and would push the next tick out by however long the lid
+    /// was shut.
+    @discardableResult
+    public func repeating(
+        every interval: TimeInterval, tolerance: TimeInterval, _ work: @escaping @MainActor () -> Void
+    ) -> any Cancellable {
+        let timer = Timer(timeInterval: interval, repeats: true) { _ in MainActor.assumeIsolated(work) }
+        timer.tolerance = tolerance
+        RunLoop.main.add(timer, forMode: .common)
+        return TimerToken(timer)
+    }
+}
+
+private struct TimerToken: Cancellable {
+    let timer: Timer
+    init(_ timer: Timer) { self.timer = timer }
+    func cancel() { timer.invalidate() }
 }
 
 private struct WorkItemToken: Cancellable {

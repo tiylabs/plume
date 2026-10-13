@@ -35,6 +35,28 @@ final class ManualScheduler: Scheduling {
         return entry
     }
 
+    @discardableResult
+    func repeating(
+        every interval: TimeInterval, tolerance: TimeInterval, _ work: @escaping @MainActor () -> Void
+    ) -> any Cancellable {
+        let token = RepeatingToken()
+        func arm() {
+            token.current = schedule(after: interval) {
+                guard !token.cancelled else { return }
+                work()
+                if !token.cancelled { arm() }
+            }
+        }
+        arm()
+        return token
+    }
+
+    private final class RepeatingToken: Cancellable {
+        var cancelled = false
+        var current: (any Cancellable)?
+        func cancel() { cancelled = true; current?.cancel() }
+    }
+
     /// Moves time forward, running everything that falls due, in order — including work scheduled by
     /// work that ran, if it also falls inside the window.
     func advance(by seconds: TimeInterval) {
