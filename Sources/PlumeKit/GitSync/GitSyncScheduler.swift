@@ -57,10 +57,21 @@ public final class GitSyncScheduler {
     private var postponements = 0
     private var recheck: (any Cancellable)?
 
+    /// The app's scheduler: the main queue, the system clock, and a real Git engine per target.
+    public convenience init() {
+        self.init(
+            scheduler: MainQueueScheduler(),
+            now: { Date() },
+            makeRunner: { GitSyncEngineRunner(target: $0) }
+        )
+    }
+
+    /// With every dependency supplied, for the suite. Not defaulted: a default argument is evaluated
+    /// outside the actor, and the main-actor types it would name cannot be built there.
     public init(
-        scheduler: any Scheduling = MainQueueScheduler(),
-        now: @escaping () -> Date = { Date() },
-        makeRunner: @escaping (GitSyncTarget) -> any GitSyncCycleRunning = { GitSyncEngineRunner(target: $0) }
+        scheduler: any Scheduling,
+        now: @escaping () -> Date,
+        makeRunner: @escaping (GitSyncTarget) -> any GitSyncCycleRunning
     ) {
         self.scheduler = scheduler
         self.now = now
