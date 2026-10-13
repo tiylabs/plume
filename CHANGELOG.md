@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > are recorded in its history, not in this file. The entries below cover this fork only. The project was renamed from Pane to Plume after v0.3.1075;
 > the older entries and their links still use the former name and repository path `tiylabs/pane`.
 
+## [v0.5.0] - 2026-10-13
+### :boom: BREAKING CHANGES
+- due to [`2a1c8ff`](https://github.com/tiylabs/plume/commit/2a1c8ffda76a7e3d218294b061f578b135ad03ef) - ✨ Add three-way desktop assignment to ⌘K *(PR [#6](https://github.com/tiylabs/plume/pull/6) by [@jorben](https://github.com/jorben))*:
+
+  the panel no longer appears on every desktop by default  
+  * fix(action-panel): 🐛 clarify pin and desktop icons  
+  * fix(spaces): 🐛 Respect Dock desktop assignments
+
+
+### :sparkles: New Features
+- [`cd4030a`](https://github.com/tiylabs/plume/commit/cd4030af4ecd214fb041bcf22d82e4df2eee8c59) - **ui**: ✨ Add license link to About settings *(commit by [@jorben](https://github.com/jorben))*
+- [`8ead213`](https://github.com/tiylabs/plume/commit/8ead213f916e55f083234b62a46bac403f4611f4) - **sync**: ✨ Add Git repository syn *(PR [#4](https://github.com/tiylabs/plume/pull/4) by [@jorben](https://github.com/jorben))*
+- [`2a1c8ff`](https://github.com/tiylabs/plume/commit/2a1c8ffda76a7e3d218294b061f578b135ad03ef) - **ui**: ✨ Add three-way desktop assignment to ⌘K *(PR [#6](https://github.com/tiylabs/plume/pull/6) by [@jorben](https://github.com/jorben))*
+
+### :bug: Bug Fixes
+- [`8e1d0cf`](https://github.com/tiylabs/plume/commit/8e1d0cfb2fd6be853bb5c6214f7bf6a52db50790) - **ui**: 🐛 Keep panel above an overlapping app when summoned *(PR [#5](https://github.com/tiylabs/plume/pull/5) by [@jorben](https://github.com/jorben))*
+
+
 ## [v0.4.1075] - 2026-10-11
 ### :sparkles: New Features
 - [`6f57f89`](https://github.com/tiylabs/plume/commit/6f57f89ea5ba7a16a92005ee355407dc7956581a) - **settings**: ✨ Halve the panel transparency range and default to 50% *(commit by [@jorben](https://github.com/jorben))*
@@ -38,3 +56,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [v0.3.1075]: https://github.com/tiylabs/pane/compare/v0.2.1075...v0.3.1075
 [v0.4.1075]: https://github.com/tiylabs/plume/compare/v0.3.1075...v0.4.1075
+[v0.5.0]: https://github.com/tiylabs/plume/compare/v0.4.1075...v0.5.0
