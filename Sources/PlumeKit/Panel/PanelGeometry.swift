@@ -18,13 +18,13 @@ public enum PanelGeometry {
     ///
     /// The web layer places the switcher and ⌘K at 15% of the panel's height (`overlay.ts`). On a
     /// panel that is already tall enough that lands where the reference draws it. On one that is not,
-    /// the panel grows — and growing it to exactly `54 + panel + 16` made the two rules disagree in
-    /// the one case the panel is the whole point: the panel came up jammed against the bottom edge
+    /// the panel grows — and growing it to exactly `54 + overlay + 16` made the two rules disagree in
+    /// the one case the overlay is the whole point: the overlay came up jammed against the bottom edge
     /// with a fifth of the panel empty above it, because 54 is a *floor* for the offset and not a
-    /// design. Growing to `panel / 0.75` gives a panel whose 15%-and-10% margins the panel actually
+    /// design. Growing to `overlay / 0.75` gives a panel whose 15%-and-10% margins the overlay actually
     /// fits between, so a grown panel looks like a tall one rather than like a shrink-wrap.
     ///
-    /// The floor is still there for a short panel, where the proportional answer would be tighter
+    /// The floor is still there for a short overlay, where the proportional answer would be tighter
     /// than the minimum margins.
     public static func panelHeight(forOverlay overlayHeight: CGFloat) -> CGFloat {
         let proportional = overlayHeight / 0.75
@@ -63,7 +63,7 @@ public enum PanelGeometry {
     /// **340, not 320, and the 20 points are ⌘K's.** Measured: the panel's longest row is *Disable
     /// Window Auto-sizing*, and with its shortcut chips hidden — which they are below 420, see
     /// `action-panel.css` — it fits at 340 and clips at 330. So this is the narrowest panel at which
-    /// every row of the panel can be read, which makes it a derived number rather than the round
+    /// every row of ⌘K can be read, which makes it a derived number rather than the round
     /// one it used to be (decision 82). Hiding the chips alone does not get there: they are worth
     /// 64px and at 320 the label is short by 91.
     public static let minimumWidth: CGFloat = 340
