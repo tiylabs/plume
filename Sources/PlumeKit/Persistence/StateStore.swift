@@ -1,6 +1,4 @@
-import AppKit
 import Foundation
-import PlumeKit
 
 /// Holds `AppState` in memory and writes it to disk without doing so on every keystroke.
 ///
@@ -10,44 +8,49 @@ import PlumeKit
 /// real at the three moments that matter — dismiss, blur and quit — which are the same three moments
 /// the note itself is flushed (decision 10).
 @MainActor
-final class StateStore {
+public final class StateStore {
 
     private let store: JSONFileStore<AppState>
-    private var pending: DispatchWorkItem?
+    private let scheduler: any Scheduling
+    private var pending: (any Cancellable)?
 
     /// Long enough to swallow a burst of caret moves, short enough that a crash costs at most a
     /// couple of seconds of "where the caret was" — which is recoverable knowledge, unlike the note.
-    private static let coalesceInterval: TimeInterval = 2.0
+    public static let coalesceInterval: TimeInterval = 2.0
 
-    private(set) var value: AppState
+    public private(set) var value: AppState
 
-    let loadOutcome: JSONFileStore<AppState>.Outcome
+    public let loadOutcome: JSONFileStore<AppState>.Outcome
 
-    init() {
+    /// The app's own `state.json`, in the Application Support folder of the running build.
+    public convenience init() {
         let store = (try? JSONFileStore<AppState>.inApplicationSupport("state.json"))
             ?? JSONFileStore<AppState>(
                 url: BuildProfile.current.fallbackSupportDirectory().appendingPathComponent("state.json")
             )
+        self.init(store: store, scheduler: MainQueueScheduler())
+    }
+
+    /// A store over any file, with any clock: what the suite uses, with a temporary folder and a
+    /// scheduler it advances by hand.
+    public init(store: JSONFileStore<AppState>, scheduler: any Scheduling) {
         self.store = store
+        self.scheduler = scheduler
         (value, loadOutcome) = store.load(default: AppState())
     }
 
     /// Mutates the state and schedules a save.
-    func update(_ body: (inout AppState) -> Void) {
+    public func update(_ body: (inout AppState) -> Void) {
         body(&value)
         scheduleSave()
     }
 
     private func scheduleSave() {
         pending?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated { self?.save() }
-        }
-        pending = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.coalesceInterval, execute: work)
+        pending = scheduler.schedule(after: Self.coalesceInterval) { [weak self] in self?.save() }
     }
 
-    func save() {
+    public func save() {
         pending?.cancel()
         pending = nil
         do {

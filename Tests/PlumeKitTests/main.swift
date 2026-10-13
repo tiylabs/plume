@@ -28,5 +28,6 @@ runGitSyncWordingTests()
 runGitSyncRepositoryTests()
 runLocalizationTests()
 runCompatibilityTests()
+runStoreTests()
 
 exit(Check.finish())

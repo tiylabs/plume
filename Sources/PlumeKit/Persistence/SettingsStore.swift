@@ -1,43 +1,57 @@
-import AppKit
 import Foundation
-import PlumeKit
 
 /// The same treatment for `settings.json`, minus the coalescing — settings change rarely, and the
 /// file is still hand-editable (decision 12) even though the Settings window (decision 16) is now
 /// the ordinary way in.
 @MainActor
-final class SettingsStore {
+public final class SettingsStore {
 
     private let store: JSONFileStore<Settings>
-    private(set) var value: Settings
+    private let profile: BuildProfile
+    public private(set) var value: Settings
 
-    var url: URL { store.url }
+    public var url: URL { store.url }
 
     /// Called after any change, whether it came from the Settings window or from the file being
     /// edited underneath us. The whole app re-reads from `value` rather than being handed a diff:
     /// there are a dozen settings and applying all of them is cheaper than working out which one
     /// moved.
-    var onChange: ((Settings) -> Void)?
+    public var onChange: ((Settings) -> Void)?
 
     /// Where themes live (decision 19). Beside `settings.json`, not in the vault — a theme is a
     /// property of this machine, and putting CSS in the notes folder would sync it and would put a
     /// non-note in a flat vault of notes.
-    var themesFolder: URL {
+    public var themesFolder: URL {
         store.url.deletingLastPathComponent().appendingPathComponent("Themes")
     }
 
-    init() {
+    /// The app's own `settings.json`, in the Application Support folder of the running build.
+    public convenience init() {
         let store = (try? JSONFileStore<Settings>.inApplicationSupport("settings.json"))
             ?? JSONFileStore<Settings>(
                 url: BuildProfile.current.fallbackSupportDirectory().appendingPathComponent("settings.json")
             )
+        self.init(store: store)
+    }
+
+    /// Settings over any file and any profile, for the suite. `bundleURL` and `homeDirectory` only
+    /// matter to the development vault migration, which looks for the old default folders there.
+    public init(
+        store: JSONFileStore<Settings>,
+        profile: BuildProfile = .current,
+        bundleURL: URL = Bundle.main.bundleURL,
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) {
         self.store = store
+        self.profile = profile
         let (loaded, outcome) = store.load(default: Settings())
         var value = loaded
-        value.isolateDevelopmentSettings()
+        value.isolateDevelopmentSettings(profile: profile)
         if outcome == .loaded {
             do {
-                try value.migrateDevelopmentVault()
+                try value.migrateDevelopmentVault(
+                    profile: profile, bundleURL: bundleURL, homeDirectory: homeDirectory
+                )
             } catch {
                 NSLog("Plume Dev: could not migrate the old scratch vault; keeping %@ — %@",
                       loaded.vaultPath, String(describing: error))
@@ -51,10 +65,10 @@ final class SettingsStore {
         }
     }
 
-    func update(_ body: (inout Settings) -> Void) {
+    public func update(_ body: (inout Settings) -> Void) {
         let before = value
         body(&value)
-        value.isolateDevelopmentSettings()
+        value.isolateDevelopmentSettings(profile: profile)
         guard value != before else { return }
 
         // Written before the callback runs, so anything the callback triggers — re-registering the
@@ -76,11 +90,11 @@ final class SettingsStore {
     /// Decision 12's promise — "changing the hotkey is a one-line edit" — was only half true while
     /// this file was read once at launch: the edit landed and nothing happened until the next
     /// relaunch, with nothing on screen to say so.
-    func reloadFromDisk() {
+    public func reloadFromDisk() {
         let (loaded, outcome) = store.load(default: value)
         guard outcome == .loaded else { return }
         var fresh = loaded
-        fresh.isolateDevelopmentSettings()
+        fresh.isolateDevelopmentSettings(profile: profile)
         if fresh != loaded { try? store.save(fresh) }
         guard fresh != value, fresh != lastWrittenOnDisk else { return }
         value = fresh
@@ -91,7 +105,7 @@ final class SettingsStore {
     ///
     /// The containing directory rather than the file: an atomic save — which is what every editor
     /// does — replaces the inode, so a watch on the file itself stops firing after the first change.
-    func watchForHandEdits() {
+    public func watchForHandEdits() {
         watcher?.stop()
         let watcher = VaultWatcher { [weak self] paths in
             guard paths.contains(where: { $0.hasSuffix("settings.json") }) else { return }

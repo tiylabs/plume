@@ -33,6 +33,13 @@ enum Check {
         suiteName = ""
     }
 
+    /// For code under test that is `@MainActor` (the stores, the schedulers). The suite runs from
+    /// top-level code on the main thread, so `assumeIsolated` states what is already true; it is a
+    /// separate entry point so the ordinary tests keep their plain, nonisolated closures.
+    static func mainSuite(_ name: String, _ body: @MainActor () -> Void) {
+        suite(name) { MainActor.assumeIsolated(body) }
+    }
+
     static func test(_ name: String, _ body: () -> Void) {
         defer { seen += 1 }
         if let shard, seen % shard.count != shard.index { return }
@@ -40,6 +47,11 @@ enum Check {
         tests += 1
         body()
         testName = ""
+    }
+
+    @MainActor
+    static func mainTest(_ name: String, _ body: @MainActor () -> Void) {
+        test(name) { MainActor.assumeIsolated(body) }
     }
 
     static func expect(
