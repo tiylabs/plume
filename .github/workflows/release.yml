@@ -9,9 +9,10 @@ on:
   release:
     types: [released]
 
-# The tag is the trigger, and the smoke test is the gate before it — see the release process in
-# CLAUDE.md. Nothing here replaces running the real app by hand first; this exists so the artifact
-# people download is built from a clean checkout rather than from whatever was in a working tree.
+# The tag is the trigger, and the smoke test (`Scripts/smoke/t1.swift`, run against `make dev`) is
+# the gate before it; AGENTS.md lists the commands. Nothing here replaces running the real app by
+# hand first; this exists so the artifact people download is built from a clean checkout rather
+# than from whatever was in a working tree.
 permissions:
   contents: write
 
