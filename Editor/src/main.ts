@@ -16,18 +16,15 @@ import "./styles/switcher.css";
 import "./styles/action-panel.css";
 
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
-import { defaultKeymap, deleteCharBackward, deleteCharForward, history, historyKeymap, indentLess, indentMore } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from "@codemirror/commands";
 import {
   deleteMarkupBackward,
   markdown,
   markdownLanguage,
 } from "@codemirror/lang-markdown";
 import { html } from "@codemirror/lang-html";
-import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
-import type { SyntaxNode } from "@lezer/common";
 import {
   Compartment,
-  EditorSelection,
   EditorState,
   type Extension,
   Prec,
@@ -52,7 +49,6 @@ import { deleteToLineStart, deleteWordAtStart, lineEnd, lineStart, selectLineEnd
 import { arrowDown, arrowUp, shiftArrowDown, shiftArrowUp } from "./keyboard/arrows";
 import { deleteForward } from "./keyboard/delete";
 import { caretPlaces } from "./markdown/caret";
-import { fencesOf, markerSpanEnd, notAPlace, ruleLine } from "./markdown/blocks";
 import { enterKey } from "./keyboard/enter";
 import { shiftEnterKey } from "./keyboard/shift-enter";
 import { splitSpans } from "./keyboard/spans";
@@ -69,6 +65,9 @@ import { noteTitle } from "./markdown/note-title";
 import { countCharacters, countWords } from "./markdown/word-count";
 import { onLanguageChange, plural, setLanguage, t, translateStaticMarkup } from "./i18n";
 import type { DockSpaceAssignmentState, HostAPI, NoteSummary, OutboundMessage, Rect, SpaceAssignmentState } from "./bridge/protocol";
+import { bulletInputRule, checkboxInputRule, fenceInputRule, ruleInputRule } from "./editor/input-rules";
+import { backspaceKey, deleteKey, selectBlockThenAll } from "./editor/select-block";
+import { DEFAULT_SHORTCUTS, keyCaps, matchesBinding } from "./editor/shortcuts";
 
 // ---------------------------------------------------------------------------------------------
 // Bridge
@@ -252,259 +251,6 @@ let formatBar: ReturnType<typeof mountFormatBar> | undefined;
 /// closes the find bar, and a `const` mounted further down would still be in its temporal dead zone.
 let find: ReturnType<typeof mountFind> | undefined;
 
-/** A new bullet takes the marker the list above it uses — to CommonMark a change of character
- * starts a second list (decision 59). Only with a list directly above at the same indent. */
-function bulletInputRule(): Extension {
-  return EditorView.inputHandler.of((view, from, to, text) => {
-    if (text !== " ") return false;
-
-    const line = view.state.doc.lineAt(from);
-    const typed = /^(\s*)([-*+])$/.exec(line.text.slice(0, from - line.from));
-    if (!typed) return false;
-
-    const indent = typed[1];
-    const marker = typed[2];
-
-    // The nearest line above that is a bullet at this indent. A blank line does not end a list, so
-    // it is skipped; anything else does.
-    let above = line.number - 1;
-    let previous: string | null = null;
-    while (above >= 1) {
-      const candidate = view.state.doc.line(above);
-      if (candidate.text.trim() === "") {
-        above -= 1;
-        continue;
-      }
-      const match = new RegExp(`^${indent}([-*+])\\s`).exec(candidate.text);
-      previous = match?.[1] ?? null;
-      break;
-    }
-
-    if (!previous || previous === marker) return false;
-
-    view.dispatch({
-      changes: { from: from - 1, to, insert: previous + " " },
-      selection: { anchor: from + 1 },
-      userEvent: "input.type",
-    });
-    return true;
-  });
-}
-
-function checkboxInputRule(): Extension {
-  return EditorView.inputHandler.of((view, from, to, text) => {
-    if (text !== " ") return false;
-
-    const line = view.state.doc.lineAt(from);
-    const before = line.text.slice(0, from - line.from);
-
-    // Only on a line of its own. After a list marker `[] ` is text: a line is one kind of item (155).
-    // On a line of its own — `[]` becomes a whole list item, which is what Typora does and what you
-    // mean when you start a line that way.
-    const indent = /^(\s*)\[\]$/.exec(before)?.[1];
-    if (indent !== undefined) {
-      const start = line.from + indent.length;
-      view.dispatch({
-        changes: { from: start, to, insert: "- [ ] " },
-        selection: { anchor: start + 6 },
-        userEvent: "input.type",
-      });
-      return true;
-    }
-
-    return false;
-  });
-}
-
-/**
- * A fence is finished the moment it is typed — decision 160.
- *
- * The backtick that makes ```` ``` ```` open a block also writes its closing fence and one empty code
- * line, and the caret goes there. Left alone, the caret stood on the opening fence — an 8px strip
- * that is not a place (151) — and what was typed next went into an info string nobody can see. Only
- * when it opens a block: the same three characters closing an open one are just typed.
- */
-function fenceInputRule(): Extension {
-  return Prec.high(EditorView.inputHandler.of((view, from, to, text) => {
-    if (from !== to || (text !== "`" && text !== "~")) return false;
-    const state = view.state;
-    const line = state.doc.lineAt(from);
-    if (from !== line.to) return false;
-    const typed = /^([ \t]*)(```|~~~)$/.exec(line.text + text);
-    if (!typed) return false;
-
-    const after = state.update({ changes: { from, insert: text } }).state;
-    const tree = ensureSyntaxTree(after, after.doc.length, 50) ?? syntaxTree(after);
-    const block = tree.resolveInner(line.from + typed[1]!.length, 1);
-    let fenced: typeof block | null = block;
-    while (fenced && fenced.name !== "FencedCode") fenced = fenced.parent;
-    if (!fenced || fenced.from !== line.from + typed[1]!.length) return false;
-    let marks = 0;
-    for (let child = fenced.firstChild; child; child = child.nextSibling) if (child.name === "CodeMark") marks += 1;
-    if (marks !== 1) return false;
-
-    const indent = typed[1]!;
-    view.dispatch({
-      changes: { from, insert: `${text}\n${indent}\n${indent}${typed[2]}` },
-      selection: { anchor: from + 2 + indent.length },
-      userEvent: "input.type",
-      scrollIntoView: true,
-    });
-    return true;
-  }));
-}
-
-/**
- * A rule is finished the moment it is typed — decision 152.
- *
- * `---` on a line of its own draws a 1px line with nothing in it, and that line is not a place the
- * caret can sit (151): parked there it is drawn below the rule, three hidden characters to the
- * right of where the text starts, over whatever line comes next. So the character that completes
- * the break also moves the caret to the first place under the rule, adding a line when the rule
- * ends the note. The same step ↓ takes from a rule, taken for the person who just made one.
- *
- * Only a line that is the break and nothing else, and only when the tree agrees it is one: `---`
- * directly under a paragraph is a setext underline, and the caret has to stay on it or the rest of
- * what they type scatters (151).
- */
-function ruleInputRule(): Extension {
-  return EditorView.inputHandler.of((view, from, to, text) => {
-    if (from !== to || !/^[-*_]$/.test(text)) return false;
-    const state = view.state;
-    const line = state.doc.lineAt(from);
-    if (from !== line.to) return false;
-    if (!new RegExp(`^[ \\t]*(?:\\${text}[ \\t]*)+$`).test(line.text)) return false;
-    // Not on the note's first line. A rule there separates nothing, and `---` at the top of an
-    // empty note is how a YAML frontmatter fence is typed — adding a line under it would break the
-    // bytes of something Plume does not interpret and must not damage (121).
-    if (line.number === 1) return false;
-
-    const after = state.update({ changes: { from, to, insert: text } }).state;
-    if (!ruleLine(after, line.number)) return false;
-
-    // The first line under the rule the caret may rest on. A blank line between two paragraphs is
-    // not one (146), so this lands where ↓ would.
-    let n = line.number + 1;
-    while (n <= after.doc.lines && notAPlace(after, n)) n += 1;
-    if (n > after.doc.lines) {
-      // Nothing below to land on: the rule takes a line of its own and the caret the one after it.
-      view.dispatch({
-        changes: { from, to, insert: `${text}\n` },
-        selection: { anchor: from + text.length + 1 },
-        userEvent: "input.type",
-        scrollIntoView: true,
-      });
-      return true;
-    }
-    view.dispatch({
-      changes: { from, to, insert: text },
-      selection: { anchor: markerSpanEnd(after, n) },
-      userEvent: "input.type",
-      scrollIntoView: true,
-    });
-    return true;
-  });
-}
-
-/** The blocks ⌘A steps through, innermost first. `ListItem` over the `Paragraph` inside it, so a task
- * item, which has no paragraph, selects like every other list (decision 65). */
-const SELECTABLE_BLOCKS = new Set([
-  "Paragraph",
-  "ATXHeading1",
-  "ATXHeading2",
-  "ATXHeading3",
-  "ATXHeading4",
-  "ATXHeading5",
-  "ATXHeading6",
-  "SetextHeading1",
-  "SetextHeading2",
-  "FencedCode",
-  "CodeBlock",
-  "HorizontalRule",
-  "Table",
-  "ListItem",
-  "Blockquote",
-]);
-
-/** ⌘A selects the block; when the selection already is the block this declines and CodeMirror's
- * `selectAll` takes the note (decision 65). */
-/** ⌫ as the key does it: the table, then CodeMirror's markup delete, then one character (170 reuses it). */
-const backspaceKey = chain(keyCommand(backspace), deleteMarkupBackward, deleteCharBackward);
-const deleteKey = chain(keyCommand(deleteForward), deleteCharForward);
-
-function selectBlockThenAll(view: EditorView): boolean {
-  const state = view.state;
-  const range = state.selection.main;
-  if (range.from === 0 && range.to === state.doc.length) return false;
-
-  // The smallest selectable block that **strictly contains** the selection, so a second press steps
-  // *out* — paragraph, then the quote around it, then the note. Taking the innermost block at the
-  // head instead sent the second press back *in*: ⌘A on a quoted note selected the quote, and ⌘A
-  // again the last paragraph inside it, because the head had moved to the quote's end (decision 65,
-  // amended 151). Both biases, because at a line start the node to the left is the block above.
-  // A block is selected from its **content**, not from its first byte — decision 153. A list item
-  // and a heading start at the line start, so ⌘A used to take `1. ` and `# ` with the text, and the
-  // inline commands wrapped them: `**1. Hi**` is not a list item any more. Nothing in a marker span
-  // is drawn as characters (151), so it is not something you can have selected either.
-  // A code block's content is its code: its fences are never drawn either, and a range ending on the
-  // closing one left its end on that 8px strip (162). A block with no code has nothing to select.
-  const rangeOf = (block: SyntaxNode): { from: number; to: number } | null => {
-    if (block.name !== "FencedCode") return { from: markerSpanEnd(state, state.doc.lineAt(block.from).number), to: block.to };
-    const { first, last, closed } = fencesOf(state, block);
-    const lastCode = closed ? last - 1 : last;
-    if (lastCode <= first) return null;
-    return { from: state.doc.line(first + 1).from, to: state.doc.line(lastCode).to };
-  };
-
-  let best: SyntaxNode | null = null;
-  for (const bias of [-1, 1] as const) {
-    for (let node: SyntaxNode | null = syntaxTree(state).resolveInner(range.head, bias); node; node = node.parent) {
-      if (!SELECTABLE_BLOCKS.has(node.name)) continue;
-      // A list item's own range, not the paragraph inside it — see SELECTABLE_BLOCKS.
-      const block = node.parent?.name === "ListItem" ? node.parent : node;
-      const take = rangeOf(block);
-      if (!take || take.from > range.from || take.to < range.to) continue;
-      // Against what this press would *select*, not against the node: the range this leaves starts
-      // past the marker, so comparing node starts made the second press pick the same block again
-      // and ⌘A never stepped out.
-      if (take.from === range.from && take.to === range.to) continue;
-      if (!best || block.to - block.from < best.to - best.from) best = block;
-    }
-  }
-  const take = best && rangeOf(best);
-  if (!take) return false;
-
-  view.dispatch({ selection: EditorSelection.range(take.from, take.to) });
-  return true;
-}
-
-/**
- * The shortcuts the Settings window can rebind (design frame 3c).
- *
- * Keyed by the same action names `Settings.shortcutActions` uses on the Swift side — the two lists
- * have to agree, and naming the action rather than the key is what lets the binding change without
- * anything here knowing.
- */
-const DEFAULT_SHORTCUTS: Record<string, string> = {
-  newNote: "Mod-n",
-  browseNotes: "Mod-p",
-  navigateBack: "Mod-[",
-  navigateForward: "Mod-]",
-  pinPlume: "Shift-Mod-p",
-  formatBar: "Alt-Mod-,",
-  actionPanel: "Mod-k",
-  revealInFinder: "Alt-Mod-r",
-  deleteNote: "Ctrl-x",
-  findInNote: "Mod-f",
-  findReplace: "Alt-Mod-f",
-  copyAsMarkdown: "Shift-Mod-c",
-  exportNote: "Shift-Mod-e",
-  hideFromCapture: "Shift-Mod-h",
-  duplicateNote: "Mod-d",
-  autoSizing: "Shift-Mod-/",
-  spaceBehaviour: "Alt-Mod-s",
-};
-
 const shortcutsCompartment = new Compartment();
 
 /** The empty-note prompt, in a compartment so a language switch can re-say it without rebuilding the
@@ -514,28 +260,6 @@ const placeholderCompartment = new Compartment();
 /** The undo history in a compartment, so it is thrown away when the note changes: undo belongs to
  * the note, or ⌘Z after a switch writes the previous note into this one's file (decision 80). */
 const historyCompartment = new Compartment();
-
-/**
- * A CodeMirror binding string as key caps — "Shift-Mod-p" becomes ⇧ ⌘ P.
- *
- * Apple's display order (⌃⌥⇧⌘, then the key), matching what the Shortcuts tab prints in Swift, so
- * the same action reads the same in both places.
- */
-export function keyCaps(binding: string): string[] {
-  if (!binding) return [];
-  const parts = binding.split("-");
-  const key = parts.pop() ?? "";
-  const held = parts.map((p) => p.toLowerCase());
-
-  const caps: string[] = [];
-  if (held.includes("ctrl") || held.includes("control")) caps.push("⌃");
-  if (held.includes("alt") || held.includes("option")) caps.push("⌥");
-  if (held.includes("shift")) caps.push("⇧");
-  if (held.includes("mod") || held.includes("cmd") || held.includes("meta")) caps.push("⌘");
-
-  caps.push(key.length === 1 ? key.toUpperCase() : key);
-  return caps;
-}
 
 
 /** What every ⌘K row does, keyed by the row's id — one table for the panel and the keymap, so a
@@ -918,48 +642,6 @@ document.getElementById("overlay-scrim")!.addEventListener("mousedown", (event) 
   actions.close();
   switcher.close();
 });
-
-/**
- * Does this keydown match a CodeMirror-style binding string — "Mod-k", "Shift-Mod-p", "Alt-Mod-,"?
- *
- * Needed only by the overlay-closing listener below. Everything else goes through CodeMirror's own
- * keymap, which does this properly; this is the one place a key has to be recognised outside it.
- */
-function matchesBinding(event: KeyboardEvent, binding: string): boolean {
-  const parts = binding.split("-");
-  const wanted = parts.pop()?.toLowerCase() ?? "";
-  let mod = false;
-  let shift = false;
-  let alt = false;
-  let ctrl = false;
-  for (const part of parts) {
-    switch (part.toLowerCase()) {
-      case "mod":
-      case "cmd":
-      case "meta":
-        mod = true;
-        break;
-      case "shift":
-        shift = true;
-        break;
-      case "alt":
-      case "option":
-        alt = true;
-        break;
-      case "ctrl":
-      case "control":
-        ctrl = true;
-        break;
-    }
-  }
-  return (
-    event.key.toLowerCase() === wanted &&
-    event.metaKey === mod &&
-    event.shiftKey === shift &&
-    event.altKey === alt &&
-    event.ctrlKey === ctrl
-  );
-}
 
 /** The bindings in force, so the listener below follows a rebind from the Settings window. */
 let liveShortcuts: Record<string, string> = { ...DEFAULT_SHORTCUTS };
