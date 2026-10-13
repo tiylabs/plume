@@ -1,16 +1,13 @@
 /**
  * The ⌘K panel at a panel width nobody designed the labels for.
  *
- * Run at **380**, which is inside the band this rule exists for: below 420 the shortcut chips go,
- * and 380 is far enough in that a stray pixel of rounding cannot decide the result. The suite that
+ * Run at **380**, which is inside the band this rule exists for: below 420 the shortcut chips wrap
+ * under their labels, and 380 is far enough in that a stray pixel of rounding cannot decide the result. The suite that
  * measures the overlays at rest runs at 460 and cannot see any of this — the probe's window is one
  * width, and until this file it was hardwired to 460.
  *
- * What is asserted is the thing that was reported: **a row you cannot read**. Six of fifteen labels
- * truncated at the old minimum — `Enable Win…`, `Copy as Ma…`, `Keep on Thi…` — which is a panel
- * that cannot answer the only question it exists to answer. So the assertions are `scrollWidth`
- * against `clientWidth` per row, not the presence of a CSS rule: a rule that is present and losing
- * to something else is exactly how this project's faults look (decision 71, four times over).
+ * Assert both parts of the narrow layout: every action label fits, and every bound shortcut chip is
+ * visible below its label. Geometry catches a rule that exists in CSS but loses in the rendered row.
  */
 export async function run(view, bar, doc) {
   const failures = [];
@@ -42,7 +39,7 @@ export async function run(view, bar, doc) {
     clipped.length === 0
   );
 
-  // And the space came from the chips rather than from somewhere that will be missed.
+  // And the keys remain visible below their labels instead of disappearing to make room.
   // Only the rows that *have* a shortcut. Recently Deleted and Rename File… are deliberately
   // unbound (decisions 35, 103), and their empty chip group has no height either — which cost one
   // assertion a false red before the reason was read.
@@ -50,17 +47,13 @@ export async function run(view, bar, doc) {
     .map((row) => row.querySelector(".actions__keys"))
     .filter((el) => el && el.querySelector("kbd"));
   check("the rows that have a shortcut still carry it", true, keys.length >= 13, keys.length >= 13);
-  const widest = Math.max(...keys.map((el) => el.getBoundingClientRect().width));
-  check("and they take no width", 0, Math.round(widest));
-
-  // Not `display: none`: decision 41's rule is that nothing in the panel may use it, and a chip group
-  // that is laid out but zero-wide is also what lets the width animate rather than snap.
-  //
-  // Read as **height**, not as a computed `display`. `getComputedStyle` is stale in this probe —
-  // its window never becomes key — while `getBoundingClientRect` is not (2026-09-01), and a
-  // `display: none` element has no height either, so the geometry answers the same question.
-  const laidOut = keys.filter((el) => el.getBoundingClientRect().height > 0);
-  check("hidden by width, never by display", keys.length, laidOut.length);
+  const keyRows = keys.filter((el) => el.getBoundingClientRect().width > 0 && el.getBoundingClientRect().height > 0);
+  check("all bound shortcuts are visible", keys.length, keyRows.length);
+  check("keys have their own line", true, keys.every((el) => {
+    const row = el.closest(".actions__row");
+    const label = row?.querySelector(".actions__label");
+    return row && label && row.getBoundingClientRect().height > label.getBoundingClientRect().height;
+  }));
 
   // Assign to Desktop names the setting in force, so its width depends on the setting: the longest
   // of its labels has to fit too, not just the None the panel opens with — and so do its choices,

@@ -133,7 +133,7 @@ const actions = ctx.actions = mountActionPanel({
   // They were literals, so rebinding New Note in the Shortcuts tab left ⌘K still advertising ⌘N —
   // which is exactly what decision 17 forbids: "a row cannot advertise a key that does something
   // else". Rows with no binding of their own (Settings…, which the menu bar owns) keep the literal.
-  keysFor: (id) => (state.liveShortcuts[id] ? keyCaps(state.liveShortcuts[id]) : null),
+  keysFor: (id) => Object.hasOwn(state.liveShortcuts, id) ? keyCaps(state.liveShortcuts[id]!) : null,
   onVisibilityChange: (open, height) => {
     send({ type: "actionsOpen", open, height });
     if (!open) view.focus();

@@ -615,6 +615,37 @@ export function runTooltips(view, doc) {
   check("the actions button prints its own key", "Actions \u2318K", label("#open-actions"));
   check("the new-note button prints its own key", "New note \u2318N", label("#new-note"));
 
+  window.plumeHost.loadNote("shortcut-history.md", "history\n", 0, false);
+  const sent = [];
+  const host = (window.webkit ??= {});
+  const handlers = (host.messageHandlers ??= {});
+  const real = handlers.plume;
+  handlers.plume = { postMessage: (message) => { sent.push(message); real?.postMessage?.(message); } };
+  const content = doc.querySelector(".cm-content");
+  for (const [key, back] of [["[", true], ["]", false]]) {
+    sent.length = 0;
+    content.dispatchEvent(new KeyboardEvent("keydown", {
+      key, code: key === "[" ? "BracketLeft" : "BracketRight", keyCode: key === "[" ? 219 : 221,
+      metaKey: true, bubbles: true, cancelable: true,
+    }));
+    check(`Command+${key} sends note navigation in the right direction`, back,
+      sent.find((message) => message.type === "navigate")?.back);
+  }
+
+  window.plumeHost.openActions();
+  const actionKeys = [...doc.querySelectorAll(".actions__row")]
+    .map((row) => [row.querySelector(".actions__label")?.textContent?.trim(), row.querySelector(".actions__keys")?.textContent?.replace(/\s/g, "")]);
+  check("New Note shows its shortcut", true, actionKeys.some(([name, keys]) => name === "New Note" && keys === "⌘N"));
+  check("Duplicate Note shows its shortcut", true, actionKeys.some(([name, keys]) => name === "Duplicate Note" && keys === "⌘D"));
+  window.plumeHost.openActions();
+  window.plumeHost.applySettings({ shortcuts: { newNote: "", duplicateNote: "" } });
+  window.plumeHost.openActions();
+  const clearedRows = [...doc.querySelectorAll(".actions__row")];
+  check("clearing New Note removes its advertised shortcut", "", clearedRows.find((row) => row.querySelector(".actions__label")?.textContent === "New Note")?.querySelector(".actions__keys")?.textContent?.trim());
+  check("clearing Duplicate Note removes its advertised shortcut", "", clearedRows.find((row) => row.querySelector(".actions__label")?.textContent === "Duplicate Note")?.querySelector(".actions__keys")?.textContent?.trim());
+  window.plumeHost.openActions();
+  window.plumeHost.applySettings({ shortcuts: {} });
+
   window.plumeHost.applySettings({ shortcuts: { browseNotes: "Mod-o", actionPanel: "Alt-Mod-k" } });
   check("a rebound switcher key reaches the bubble", "Notes \u2318O", label("#browse"));
   check("and a chorded one renders every cap", "Actions \u2325\u2318K", label("#open-actions"));

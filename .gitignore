@@ -76,5 +76,4 @@ CLAUDE.md
 .claude/
 
 # Pi Agent's session state
-.pi/tasks/
-.pi/delegate/
+.pi/
