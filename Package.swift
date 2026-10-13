@@ -6,8 +6,8 @@ import PackageDescription
 // assembles the .app around the binary.
 //
 // The split is deliberate. PlumeKit holds everything that is pure Foundation — filenames, hashing,
-// the write model, the vault watcher, state persistence, geometry arithmetic, switcher ordering — so
-// it can be unit-tested without a window server. Plume holds only what genuinely needs AppKit, WebKit
+// the write model, the note session, the bridge message types, the vault watcher, state persistence,
+// Git sync, geometry arithmetic, switcher ordering — so it can be unit-tested without a window server. Plume holds only what genuinely needs AppKit, WebKit
 // or Carbon.
 let package = Package(
     name: "Plume",

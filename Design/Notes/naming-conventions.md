@@ -7,11 +7,12 @@ How code is named and where it lives. These rules describe the code as it is; wh
 
 ```
 Sources/PlumeKit/        Foundation only. Anything that can be tested without a window server.
-  Notes/  Vault/  GitSync/  Persistence/  Panel/  Input/  Support/
+  Notes/  Vault/  Session/  Bridge/  GitSync/  Persistence/  Panel/  Input/  Support/
 Sources/Plume/           AppKit, WebKit, Carbon. The app itself.
   App/  Panel/  Bridge/  Spaces/  MenuBar/  Services/  Settings/
+Sources/DockSpaceProbe/  A diagnostic executable for Dock "Assign To" detection; not part of the app.
 Tests/PlumeKitTests/     The PlumeKit suite — an executable, not an XCTest target (see Package.swift).
-Editor/src/              The web layer: bridge/  markdown/  keyboard/  ui/  styles/
+Editor/src/              The web layer: bridge/  editor/  format/  markdown/  keyboard/  ui/  styles/
 Editor/tests/            unit/ (keyboard tables, run in node)  webview/ (run in a real WKWebView)
 App/                     Info.plist, icons and menu bar images that the build copies into the .app
 Scripts/                 build, test and CI scripts; tools/ holds the Swift helpers
