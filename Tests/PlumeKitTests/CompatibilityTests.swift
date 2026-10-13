@@ -5,7 +5,7 @@ import PlumeKit
 /// by the previous one, after a downgrade — so the names in them are frozen: the keys of
 /// `settings.json` and `state.json`, including the ones that look like leftovers (`plumes`,
 /// `pinPlume`). A refactor that renames a Swift property must keep the JSON byte-identical, and
-/// these tests are what says so. See docs/architecture-refactor-plan.md, section 2.
+/// these tests are what says so. See Design/Notes/architecture-refactor-plan.md, section 2.
 ///
 /// Fixtures live in `Fixtures/` beside this file and are found through `#filePath`, because the
 /// suite is an executable target rather than one with SwiftPM resources.

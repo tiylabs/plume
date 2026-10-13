@@ -15,7 +15,8 @@ Design/
 │   └── settings-design-spec.md   layout tokens for the Settings window
 └── Notes/
     ├── dock-space-detection.md   how the Dock's "Assign To" setting is read
-    └── naming-conventions.md     how code is named and laid out, and the names that must not change
+    ├── naming-conventions.md     how code is named and laid out, and the names that must not change
+    └── architecture-refactor-plan.md   the phased plan for restructuring the code, with acceptance criteria
 ```
 
 ## Which exploration became the final

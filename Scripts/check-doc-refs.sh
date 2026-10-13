@@ -4,7 +4,7 @@
 #
 # Comments here used to cite "decision 76", "design frame 2a" or "LAB.md" — pieces of a private
 # decision record that is not published. To anyone else those are dead links, so they are being
-# rewritten into self-contained explanations (docs/architecture-refactor-plan.md, section 10.1) and
+# rewritten into self-contained explanations (Design/Notes/architecture-refactor-plan.md, section 10.1) and
 # no new ones may be added.
 #
 # The number of matches is held in Scripts/doc-refs.baseline. The check is strict in both
@@ -15,9 +15,9 @@
 #   Scripts/check-doc-refs.sh           check
 #   Scripts/check-doc-refs.sh --list    show every match
 #
-# The count is of matches, not of lines, and covers every tracked text file except two: .gitignore
-# (whose comment explains why those documents stay local) and this script, which has to quote the
-# patterns it looks for.
+# The count is of matches, not of lines, and covers every tracked text file except three: .gitignore
+# (whose comment explains why those documents stay local), this script, and the refactoring plan
+# (Design/Notes/architecture-refactor-plan.md) — the last two have to quote the patterns they discuss.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -26,7 +26,7 @@ BASELINE_FILE=Scripts/doc-refs.baseline
 
 matches() {
 	# `|| true`: grep exits 1 when a file has no match, which is the good case.
-	git ls-files -z | { grep -zvE '^(\.gitignore|Scripts/check-doc-refs\.sh)$' || true; } | xargs -0 grep -InoE "$PATTERN" 2>/dev/null || true
+	git ls-files -z | { grep -zvE '^(\.gitignore|Scripts/check-doc-refs\.sh|Design/Notes/architecture-refactor-plan\.md)$' || true; } | xargs -0 grep -InoE "$PATTERN" 2>/dev/null || true
 }
 
 if [[ "${1:-}" == "--list" ]]; then
@@ -57,7 +57,7 @@ if [[ "$actual" -gt "$baseline" ]]; then
 	done
 	echo "  Matches added since ${base:-the first commit}:" >&2
 	[[ -n "$base" ]] || base=$(git rev-list --max-parents=0 HEAD | tail -1)
-	git diff -U0 "$base" -- . ':(exclude).gitignore' ':(exclude)docs' ':(exclude)Scripts/check-doc-refs.sh' \
+	git diff -U0 "$base" -- . ':(exclude).gitignore' ':(exclude)docs' ':(exclude)Scripts/check-doc-refs.sh' ':(exclude)Design/Notes/architecture-refactor-plan.md' \
 		| grep -E '^\+[^+]' | grep -E "$PATTERN" | head -20 >&2 || true
 	exit 1
 elif [[ "$actual" -lt "$baseline" ]]; then

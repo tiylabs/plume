@@ -10,7 +10,7 @@
  * `bridge-names.txt` so adding, removing or renaming one is a visible, reviewed change.
  *
  * This is the interim guard. It is replaced by a typed contract test once the protocol moves into
- * PlumeKit (docs/architecture-refactor-plan.md, PR 3.5).
+ * PlumeKit (Design/Notes/architecture-refactor-plan.md, PR 3.5).
  *
  *   node tests/bridge-names.mjs            check
  *   node tests/bridge-names.mjs --update   rewrite bridge-names.txt after a deliberate change
