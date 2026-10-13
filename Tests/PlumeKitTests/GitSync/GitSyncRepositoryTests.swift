@@ -5,6 +5,7 @@ import PlumeKit
 /// that vanished, a push that lost a race, a branch that does not exist yet, and whose identity commits.
 ///
 /// Runs `git` for real, with the user's own git configuration set aside (see `withIsolatedGit`).
+
 // MARK: - Against real repositories
 
 /// Real git, real repositories on disk, and nothing from the machine running the suite.

@@ -77,7 +77,6 @@ final class MainMenuBuilder: NSObject {
         NSApp.mainMenu = main
     }
 
-
     /// The two File-menu items whose keys are rebindable. See `applyMenuShortcuts`.
     private var newNoteItem: NSMenuItem?
     private var browseNotesItem: NSMenuItem?

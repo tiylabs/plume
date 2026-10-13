@@ -179,7 +179,7 @@ func runStateTests() {
             Check.equal(s.lastUsedFilename, "b.md")
         }
 
-        Check.test("an untouched vault has no last-used note")  {
+        Check.test("an untouched vault has no last-used note") {
             Check.expect(AppState().lastUsedFilename == nil)
         }
 

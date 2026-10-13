@@ -138,7 +138,7 @@ public enum ReleaseCheck {
         let allowed = CharacterSet(charactersIn:
             "0123456789.-+abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
         guard parse(tag) != nil,
-              tag.unicodeScalars.allSatisfy { allowed.contains($0) },
+              tag.unicodeScalars.allSatisfy({ allowed.contains($0) }),
               !tag.contains("..")
         else { return nil }
         return releases.appendingPathComponent("tag").appendingPathComponent(tag)

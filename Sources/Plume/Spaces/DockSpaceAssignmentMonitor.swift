@@ -37,11 +37,19 @@ final class DockSpaceAssignmentMonitor {
     func stop() {
         pollingTask?.cancel()
         pollingTask = nil
+        // Observers attach in `start`, which `PanelController` may call again after `stop`, so
+        // removal cannot wait for `deinit` — this is the lifecycle point paired with attachment.
+        // swiftlint:disable:next notification_center_detachment
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
-    deinit { pollingTask?.cancel() }
+    deinit {
+        pollingTask?.cancel()
+        // The rule wants removal here; `stop` already does it when the panel is torn down.
+        NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
 
     @objc func refresh() {
         guard !readInFlight else { return }

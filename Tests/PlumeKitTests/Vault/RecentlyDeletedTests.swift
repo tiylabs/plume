@@ -242,7 +242,7 @@ func runRecentlyDeletedTests() {
             let vault = tempDirectory("vault")
             let store = tempDirectory("deleted")
 
-            try? RecentlyDeleted.keep(
+            _ = try? RecentlyDeleted.keep(
                 "# Standup\n", as: "2026-08-11-1453-standup.md", into: store,
                 at: at("2026-08-16T01:45:30Z"), timeZone: utc
             )
@@ -264,8 +264,8 @@ func runRecentlyDeletedTests() {
             let store = tempDirectory("deleted")
             let when = at("2026-08-16T01:45:30Z")
 
-            try? RecentlyDeleted.keep("first", as: "2026-08-11-1453-note.md", into: store, at: when, timeZone: utc)
-            try? RecentlyDeleted.keep("second", as: "2026-08-11-1453-note.md", into: store, at: when, timeZone: utc)
+            _ = try? RecentlyDeleted.keep("first", as: "2026-08-11-1453-note.md", into: store, at: when, timeZone: utc)
+            _ = try? RecentlyDeleted.keep("second", as: "2026-08-11-1453-note.md", into: store, at: when, timeZone: utc)
 
             Check.equal(
                 names(in: store),

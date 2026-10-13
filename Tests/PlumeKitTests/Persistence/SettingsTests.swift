@@ -94,7 +94,7 @@ func runSettingsTests() {
         Check.test("no action is in both tables") {
             let recordable = Set(Settings.shortcutActions.map(\.key))
             let fixed = Set(Settings.fixedShortcuts.map(\.key))
-            Check.equal(recordable.intersection(fixed).isEmpty, true)
+            Check.equal(recordable.isDisjoint(with: fixed), true)
         }
         Check.test("every action resolves to a binding") {
             for action in Settings.allShortcuts {

@@ -40,7 +40,6 @@ public final class NoteSession {
 
     // MARK: - Session state
 
-
     public internal(set) var currentFilename: String?
     var bufferText = ""
     /// Hash of the bytes we believe are on disk. `nil` means "we have not read this file yet", which
@@ -112,8 +111,7 @@ public final class NoteSession {
             return
         }
         // Nothing remembered: take whatever the vault has, most recent first.
-        vault.rows(query: "", state: state.value, current: nil, order: settings.value.noteOrder) {
-            [weak self] snapshot in
+        vault.rows(query: "", state: state.value, current: nil, order: settings.value.noteOrder) { [weak self] snapshot in
             guard let self else { return }
             if let first = snapshot.rows.first {
                 self.open(first.filename)
