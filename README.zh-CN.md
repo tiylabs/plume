@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="artifacts/plume-icon.png" alt="Plume" width="120">
+  <img src="Artifacts/plume-icon.png" alt="Plume" width="120">
 </p>
 
 <h1 align="center">Plume</h1>
@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="artifacts/plume-hero.png" alt="Plume 浮在代码编辑器上方" width="760">
+  <img src="Artifacts/plume-hero.png" alt="Plume 浮在代码编辑器上方" width="760">
 </p>
 
 按 <kbd>⌃⌥Space</kbd>，笔记就浮到当前窗口上，写完再按一下就收起。

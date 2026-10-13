@@ -335,7 +335,7 @@ Editor/tests/
 
 **截图**（已确认删除）：
 - `git rm` 以下 5 个文件：`artifacts/plume-actions.png`、`artifacts/plume-dark.png`、`artifacts/plume-settings.png`、`artifacts/plume-switcher.png`、`artifacts/ScreenShot_2026-10-11_025745_836@2x.png`。
-- 已核实：`README.md` 和 `README.zh-CN.md` 都只引用 `plume-icon.png` 和 `plume-hero.png`。`artifacts/` 目录名不变。
+- 已核实：`README.md` 和 `README.zh-CN.md` 都只引用 `plume-icon.png` 和 `plume-hero.png`。`artifacts/` 目录名当时不变（2026-10-13 之后为统一首字母大写改名为 `Artifacts/`，见 A.9）。
 
 **设计素材**（全部保留，只重新组织）：
 ```
@@ -853,7 +853,7 @@ src/ui/format-bar.ts      BUTTONS、icon、mountFormatBar（≤ 450 行）
 | `Scripts` | 13 | `smoke/t1.swift`（其中包括那 1 处 `LAB.md`） |
 | `.github` | 4 | `ci.yml` |
 | `Themes` | 2 | 两个预置主题的第 8 行 |
-| `packaging` | 1 | `plume.rb` |
+| `Packaging`（原 `packaging`） | 1 | `plume.rb` |
 
 **节奏**（三条路并行，引用数只减不增）：
 1. **护栏**（PR 0.6）：计数棘轮禁止新增引用。
@@ -963,6 +963,23 @@ src/ui/format-bar.ts      BUTTONS、icon、mountFormatBar（≤ 450 行）
 2. 写出策略明确（继续写旧名，或者只在 schemaVersion 升级时切换）；
 3. 更新快照测试，并在 PR 描述中说明；
 4. 在 CHANGELOG 中记录。
+
+### A.9 目录命名
+
+**同一层级内风格一致**；风格跟着该目录所属的生态走，不跨生态统一。
+
+| 区域 | 风格 | 例子 | 原因 |
+|---|---|---|---|
+| 仓库根目录 | 首字母大写（PascalCase） | `Sources`、`Tests`、`Scripts`、`Design`、`Themes`、`Locales`、`Packaging`、`Artifacts`、`App`、`Editor` | `Sources`、`Tests` 是 SwiftPM 规定的名字，其余向它看齐 |
+| `Sources/*`、`Tests/*` 及其子目录 | PascalCase | `Sources/PlumeKit/GitSync`、`Sources/DockSpaceProbe` | 目录名对应模块和领域名 |
+| `Editor/` 内部（`src`、`tests`、`bridge`…） | 小写 | `Editor/src/bridge` | npm / TypeScript 惯例 |
+| 语言目录 | BCP 47 标识符原样 | `Locales/zh-Hans` | 要与系统的语言标识一致 |
+| 平台强制的名字 | 按平台规定 | `.github` | |
+| `Scripts/` 内部 | 小写 | `Scripts/tools`、`Scripts/smoke` | 与脚本文件名（kebab-case）一致 |
+
+- **根目录的例外**只有点开头的目录（`.github`）和生成物（`build`、`.build`）；生成物已在 `.gitignore` 里。
+- **可执行 target 放在 `Sources/` 下**，不另设根目录 `Tools/`（2026-10-13 把 `Tools/DockSpaceProbe` 移到 `Sources/DockSpaceProbe`）。`Scripts/tools/` 只放脚本，不放 SwiftPM target。
+- 在大小写不敏感的文件系统（macOS 默认）上，只改大小写的 `git mv` 要分两步，先改成临时名再改成目标名。
 
 ### A.8 注释规范（方案 B）
 注释要能独立读懂。理由写在注释里，不引用仓库外的文档。

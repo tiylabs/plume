@@ -349,7 +349,7 @@ jobs:
           sed -E \
             -e "s/^(  version )\".*\"/\1\"$VERSION\"/" \
             -e "s/^(  sha256 )\".*\"/\1\"$SHA256\"/" \
-            packaging/plume.rb > plume.rb
+            Packaging/plume.rb > plume.rb
           grep -q "version \"$VERSION\"" plume.rb
           grep -q "sha256 \"$SHA256\"" plume.rb
 
