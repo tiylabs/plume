@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 状态 | 阶段 0–3 已实施；阶段 4 待开始 |
+| 状态 | 阶段 0–4 已实施；待做：dev 构建日常使用 ≥ 3 天，然后合入 |
 | 日期 | 2026-10-13 |
 | 基线提交 | `2a1c8ff`（master） |
 | 范围 | 模块划分、项目架构、目录结构、命名规范、工程护栏 |
@@ -799,11 +799,30 @@ src/ui/format-bar.ts      BUTTONS、icon、mountFormatBar（≤ 450 行）
 - 验收：`format-bar.ts` ≤ 450 行；新增单测用例 ≥ 55 条（11 × 5）。
 
 ### 9.4 阶段 4 验收
-- [ ] 不存在 `PlumeController`；`PanelController` ≤ 600 行；任何 Swift 文件 ≤ 800 行
-- [ ] `NoteSession` 的 14 个场景测试全部通过
-- [ ] `AppDelegate` ≤ 250 行；`main.ts` ≤ 300 行；`format-bar.ts` ≤ 450 行
-- [ ] SwiftLint 收紧到"阶段 4 结束"一列的阈值后仍为绿
-- [ ] 使用 dev 构建作为日常主力 ≥ 3 天，期间没有回归，然后再合入 master 发布
+- [x] 不存在 `PlumeController`；`PanelController` ≤ 600 行（493）；任何 Swift 文件 ≤ 800 行（最大 `NoteSession.swift` 702）
+- [x] `NoteSession` 的场景测试全部通过：方案列的 14 个场景都有，另有 26 个相邻场景，共 40 个（`NoteSessionTests`，577 个测试里的一部分）
+- [x] `AppDelegate` ≤ 250 行（28）；`main.ts` ≤ 300 行（260）；`format-bar.ts` ≤ 450 行（353）
+- [x] SwiftLint 收紧到阶段 4 的阈值后仍为绿：file 800 / type body 450 / function body 100（比方案写的 1000 / 700 / 150 更严，因为代码实测远低于它）
+- [ ] 使用 dev 构建作为日常主力 ≥ 3 天，期间没有回归，然后再合入 master 发布 —— **未做，也不是能在实施中完成的事**
+
+#### 实施记录（与方案的差异）
+
+- **顺序**：方案是 4.1 接缝 → 4.2 搬迁 → 4.3 测试。实际是把 4.1 和 4.2 合成一步（先抽出 `NoteSessionOutput`，再把代码搬过去，没有先在原文件里做一轮接缝），然后补 4.3。原因：4.1 要在 AppKit 类里原地替换调用，而搬迁本身就是做这个替换，分两步只会让同一批行改两遍。代价是 4.2 没有测试兜底，靠的是下面三条。
+- **4.2 的兜底**：（1）搬迁前后的代码行做了多重集合对比，除预期的机械替换（`editor.send` → `output.*`、`DispatchWorkItem` → `Scheduling`、`tr` → `L10n.t`、`private` 放宽）外无差异；（2）smoke t1 在**改动前**的 `2a1c8ff` 上和改动后各跑一遍，62 项逐条一致（见下）；（3）对 `NoteSession` 做 8 种变异验证。
+- **`NoteSession` 的接口**：与草案基本一致，差别是 `rename(toTyped:)` 取代了 `rename(to:)`（slug 和唯一化在会话里做，对话框留在面板），多了 `openLastUsedIfNothingOpen()`、`buffer`，`NoteSessionOutput` 多了 `news(_:)` 和 `isPanelVisible`（"在隐藏的面板里加载笔记不抢键盘"这条规则要读它），`vaultMayBeMissing` 改名 `vaultIsGone`（会话自己判断文件夹是否还在，输出只负责提问）。`NoteSession+External.swift` 是从主文件拆出的同类型 extension，因为主文件 946 行超过了 800。
+- **`PanelController` 的拆分**：493 行的主文件 + 6 个同类型 extension 文件（Spaces、Geometry、Capture、Messages、Window、SessionOutput）。拆分是纯移动加把 `private` 放宽为 internal；移动前后的非注释代码行多重集合完全一致，只多 3 对 `extension {}`。
+- **`EditorBridgeRouter`**：31 个 case 一个不少，每个 case 一行；各自的函数体是从旧 `switch` 里原样挪到 `PanelController+Messages.swift`。
+- **`AppDelegate` 的拆分**：`AppCoordinator`（384 行，持有全部进程级对象）、`VaultCoordinator`、`UpdateCoordinator`、`MainMenuBuilder`；`AppDelegate` 只剩三个系统回调。每个新类型只拿它用到的依赖（`UpdateCoordinator` 不认识设置窗口，`MainMenuBuilder` 只收 4 个闭包）。启动顺序逐行对照过。`AppCoordinator` 仍有 384 行，因为 `settingsChanged` 和 `openSettingsWindow`（合起来约 100 行）还在里面，它们是"应用把各部分接起来"的核心，没有再拆。
+- **`main.ts`**：拆成 `editor/{dom,state,ctx,chrome,chrome-tips,setup,overlays,input-rules,select-block,shortcuts}.ts` 和 `bridge/{host,send}.ts`。**与方案不同**：方案说用 `createHost(deps)` 解决顺序问题；实际 `host` 用了，但其余部分（`actions`、`switcher`、`view`、两个底栏）互相引用，所以另加了一个 `ctx` 对象：`main.ts` 启动时把造好的部件放进去，各处理函数在**调用时**才读它。可变状态原来是模块级 `let`，import 进来的绑定不能赋值，所以放进 `state` 对象。验证方式：未压缩 bundle 的代码行多重集合在归一化 esbuild 的重命名后差集为 0。
+- **`format-bar.ts`**：拆成 `format/{inline,block,keys}.ts` 和 UI（353 行）。UI 文件保留了 `MARKDOWN_FORMAT_KEYS`、`setHeading`、`pendingPair`、`pendingWrapExtension` 的 re-export，其余 6 个文件的 import 路径没改。验证方式同上，未压缩 bundle 的差集为 0。
+- **新增的格式测试**：方案要求 ≥ 55 条，实际 `format-commands.test.ts` 是 105 条（11 命令 × 5 选区 × 两次按键，与 `commands.test.js` 同一份夹具和期望值）+ `format-rules.test.ts` 的 37 条边界用例，键盘表从 187 增到 328。用的是 `StubView`（只有 `state`、`dispatch`、`focus`）跑真实的解析器。变异验证抓到一个漏洞：最初没有任何用例钉住"列表命令作用在另一种列表上是换标记"，补了 9 条之后才被抓到。
+- **没有做到的**：`NoteSession` 的变异验证中，"重命名可以在写入进行中开始"这一条（`considerRename` 里的 `!isWriting`）**没有被抓到**，我判断它在当前结构下不可观察：`considerRename` 只从写入完成的回调里被调用，那时 `isWriting` 已经是 false。守卫是冗余的，所以留着，没有为它造测试。
+
+##### 运行时验证（2026-10-13）
+
+- **`Scripts/test-all.sh` 全绿**：PlumeKit 577 个测试 / 3475 断言，键盘表 328 个用例，WKWebView 1419 条断言不变。
+- **smoke t1**：62 项里 58 项通过，**4 项失败，在 `2a1c8ff`（重构前）上同样 4 项失败，逐条一致**：`elsewhere` 的两个 toast 断言（脚本写死英文，本机界面是中文）和 `hotkey` 的两个"另一个 app 拿走焦点后面板保持显示"（环境相关）。`AppDelegate` 拆分之后又跑了一遍（62 项，同样的 4 个失败），并且确认了冷启动、手改 `settings.json` 的语言和字号热更新、输入后立即退出时草稿能落盘（笔记文件在，内容完整）。
+- **最后一轮（`main.ts` 和 `format-bar.ts` 拆分之后）没能跑 smoke**：本机屏幕在这个时间点被锁定（`CGSSessionScreenIsLocked = Yes`），合成按键进不了面板，连 `2a1c8ff` 的构建也一样呼不出来，所以这不是回归，但也**意味着最后这两步 Editor 拆分没有在真实应用里跑过**。它们的验证来自：1419 条真实 WKWebView 断言、328 条键盘表用例、23 个 `EditorCommand` 的 bridge probe（对真实 bundle，无 JS 异常，DOM 结果与拆分前一致）、未压缩 bundle 代码行差集为 0。**请在屏幕解锁后重跑 `swift Scripts/smoke/t1.swift`**。
 
 ---
 
@@ -1091,6 +1110,25 @@ git ls-files 'Design/*.png' | wc -l
 | PlumeKit 测试 | 463 个测试 / 3014 断言 | 528 个测试 / 3301 断言 | ≥ 此值 |
 | WKWebView 套件断言 | 1419 | 1419 | ≥ 此值 |
 | 未公开文档引用 | 746 | 746（新增的文件没有引入新引用） | 明显下降，L2 清零 |
+| `@unchecked Sendable` | 7 | 7 | L4 目标为 0 |
+
+### 阶段 4 结束时的度量（2026-10-13，`refactor/architecture` 分支）
+
+| 指标 | 阶段 3 结束 | 阶段 4 结束 | 目标 |
+|---|---|---|---|
+| `PanelController.swift` | 2076 | 493（+ 6 个 extension 文件，合计 1178） | ≤ 600 |
+| `AppDelegate.swift` | 683 | 28（+ `AppCoordinator` 384） | ≤ 250 |
+| `NoteSession.swift` | — | 702（+ `+External` 248） | ≤ 800 |
+| `Editor/src/main.ts` | 1283 | 260 | ≤ 300 |
+| `Editor/src/ui/format-bar.ts` | 1426 | 353 | ≤ 450 |
+| 最大 Swift 文件 | 2076 | 702 | ≤ 800 |
+| Swift 代码量：Plume / PlumeKit / Tests | 7019 / 8007 / 6733 | 6336 / 9142 / 7821 | Plume 继续下降 |
+| PlumeKit 测试 | 528 个测试 / 3301 断言 | 577 个测试 / 3475 断言 | ≥ 此值 |
+| 键盘表用例 | 187 | 328 | ≥ 此值 |
+| WKWebView 套件断言 | 1419 | 1419 | ≥ 此值 |
+| `NoteSession` 场景测试 | — | 40 | ≥ 14 |
+| SwiftLint 长度阈值（error） | 2200 / 1000 / 140 | 800 / 450 / 100 | 1000 / 700 / 150 |
+| 未公开文档引用 | 746 | 734 | 明显下降，L2 清零 |
 | `@unchecked Sendable` | 7 | 7 | L4 目标为 0 |
 
 ---
