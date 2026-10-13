@@ -267,7 +267,7 @@ final class PanelController: NSObject {
     /// Puts a message over the note for a moment. `dwell` is for a toast that is not a receipt —
     /// see the editor's `showToast` and decision 136.
     func showToast(_ text: String, dwell: Int? = nil) {
-        editor.call("showToast", dwell.map { [text, $0] as [Any] } ?? [text])
+        editor.send(.showToast(text, dwell: dwell))
     }
 
     /// How long a toast that is news stays up, against a receipt's 1900 ms (decision 136).
@@ -365,7 +365,7 @@ final class PanelController: NSObject {
         // cursor — so a panel that opens under a stationary pointer gets no `mouseenter` and would
         // sit dimmed until the mouse moved. Only Swift knows the new frame and the pointer at once.
         isHovered = isPointerOnPanel(NSEvent.mouseLocation)
-        editor.call("setHover", [isHovered])
+        editor.send(.setHover(isHovered))
         refreshCloseHover()
         // The height the note wanted may have moved while the panel was away — an external edit, or a
         // note switched from the menu bar. Reconciling here rather than waiting for the web layer's
@@ -376,7 +376,7 @@ final class PanelController: NSObject {
         // A summon is a new sitting with the note, and undo belongs to the sitting — see
         // `resetHistory`. Without it ⌘Z reaches back across the dismissal and can empty a note that
         // was written in one burst.
-        editor.call("resetHistory")
+        editor.send(.resetHistory)
         editor.focusEditor()
 
         // Re-assert key status once the current event has finished.
@@ -479,7 +479,7 @@ final class PanelController: NSObject {
                 panel.present(at: frame)
                 applyContentHeight(heightWanted)
                 // Still a new sitting with the note — see `summon`.
-                editor.call("resetHistory")
+                editor.send(.resetHistory)
                 onSummoned?()
                 if currentFilename == nil, !isDraft {
                     openLastUsedNote()
@@ -513,11 +513,9 @@ final class PanelController: NSObject {
         let desktop = assignment == .oneSpace
             ? settings.value.assignedSpace.flatMap { Spaces.desktop(uuid: $0) }
             : Spaces.active()
-        editor.call("setSpaceAssignment", [
-            assignment.rawValue,
-            desktop.map { $0.number as Any } ?? NSNull(),
-            Spaces.isAvailable,
-        ])
+        editor.send(.setSpaceAssignment(
+            mode: assignment.rawValue, desktop: desktop?.number, canKeepToOne: Spaces.isAvailable
+        ))
         sendDockSpaceAssignment()
     }
 
@@ -536,10 +534,7 @@ final class PanelController: NSObject {
         case .unknown(let reason):
             mode = reason == .notReadYet ? "checking" : "unknown"
         }
-        editor.call("setDockSpaceAssignment", [
-            mode,
-            desktop.map { $0.number as Any } ?? NSNull(),
-        ])
+        editor.send(.setDockSpaceAssignment(mode: mode, desktop: desktop?.number))
     }
 
     private func rememberFrame() {
@@ -694,7 +689,9 @@ final class PanelController: NSObject {
         panelState = next
 
         let noteState = state.value.note(filename)
-        editor.call("loadNote", [filename, text, noteState.caretOffset, noteState.isPinned])
+        editor.send(.loadNote(
+            filename: filename, text: text, caret: noteState.caretOffset, pinned: noteState.isPinned
+        ))
         hideBanner()
         if isVisible { editor.focusEditor() }
 
@@ -731,7 +728,7 @@ final class PanelController: NSObject {
 
         // Empty filename rather than a made-up one: the web layer reads it as "no note", so ⌃X and
         // the pin decline rather than acting on a file that does not exist.
-        editor.call("loadNote", ["", "", 0, false])
+        editor.send(.loadNote(filename: "", text: "", caret: 0, pinned: false))
         hideBanner()
         if isVisible { editor.focusEditor() }
     }
@@ -809,7 +806,7 @@ final class PanelController: NSObject {
         next.noteFilename = filename
         panelState = next
 
-        editor.call("setNoteFilename", [filename])
+        editor.send(.setNoteFilename(filename))
         onPinsChanged?()
         refreshSwitcherIfOpen()
 
@@ -840,7 +837,7 @@ final class PanelController: NSObject {
                 // without this the only evidence anything happened is a filename you cannot see.
                 //
                 // One word, because that is the whole of what needs saying (decision 76).
-                self.editor.call("showToast", [tr("toast.duplicated")])
+                self.editor.send(.showToast(tr("toast.duplicated")))
             case .failure(let error):
                 self.showBanner(.problem(tr("error.duplicateFailed", ["message": error.localizedDescription])))
                 self.checkVaultStillThere()
@@ -854,7 +851,7 @@ final class PanelController: NSObject {
         state.update { pinned = $0.togglePin(filename) }
 
         if filename == currentFilename {
-            editor.call("setPinned", [pinned])
+            editor.send(.setPinned(pinned))
         }
         onPinsChanged?()
         refreshSwitcherIfOpen()
@@ -887,7 +884,7 @@ final class PanelController: NSObject {
             // So the message names the place rather than just confirming: ⌃X is one keystroke away
             // from ⌘X, and the answer to hitting it by accident should be on screen, not in the
             // documentation. Floating, so it costs no height (see `.plume__toast`).
-            self.editor.call("showToast", [tr("toast.movedToDeleted")])
+            self.editor.send(.showToast(tr("toast.movedToDeleted")))
 
             if filename == self.currentFilename {
                 self.currentFilename = nil
@@ -971,7 +968,7 @@ final class PanelController: NSObject {
                     // would move the caret). The two layers then disagree about which file is open,
                     // and every message that names a file is wrong: ⌃X would delete the original,
                     // the one now holding the other machine's version, and ⇧⌘P would pin it.
-                    self.editor.call("setNoteFilename", [sibling])
+                    self.editor.send(.setNoteFilename(sibling))
                     self.showBanner(.conflict)
                 }
 
@@ -1069,7 +1066,7 @@ final class PanelController: NSObject {
 
         // The web layer is told for the same reason the conflict path tells it: `loadNote` is the
         // only other thing that sets this, and this path must not reload (it would move the caret).
-        editor.call("setNoteFilename", [new])
+        editor.send(.setNoteFilename(new))
         onPinsChanged?()
         refreshSwitcherIfOpen()
     }
@@ -1223,10 +1220,10 @@ final class PanelController: NSObject {
                     self.bufferText = text
                     self.baselineHash = hash
                     let noteState = self.state.value.note(current)
-                    self.editor.call(
-                        "loadNote",
-                        [current, text, min(noteState.caretOffset, text.utf16.count), noteState.isPinned]
-                    )
+                    self.editor.send(.loadNote(
+                        filename: current, text: text,
+                        caret: min(noteState.caretOffset, text.utf16.count), pinned: noteState.isPinned
+                    ))
                 }
 
             case .writeConflictSibling:
@@ -1407,14 +1404,7 @@ final class PanelController: NSObject {
             order: settings.value.noteOrder
         ) { [weak self] snapshot in
             guard let self else { return }
-            self.editor.callJSON(
-                "showNotes",
-                [
-                    EditorWebView.encode(snapshot.rows),
-                    String(snapshot.total),
-                    EditorWebView.encode(snapshot.query),
-                ]
-            )
+            self.editor.send(.showNotes(snapshot.rows, total: snapshot.total, query: snapshot.query))
         }
     }
 
@@ -1461,24 +1451,24 @@ final class PanelController: NSObject {
 
     func openSwitcher() {
         if !isHere { summon() }
-        editor.call("openSwitcher")
+        editor.send(.openSwitcher)
     }
 
     func openActions() {
         if !isHere { summon() }
-        editor.call("openActions")
+        editor.send(.openActions)
     }
 
     // MARK: - Banner
 
     private func showBanner(_ banner: Banner) {
-        editor.call("showBanner", [banner.kind, banner.text])
+        editor.send(.showBanner(kind: banner.kind, text: banner.text))
     }
 
     /// A banner belongs to the note it was raised for, so loading a note clears it — with no
     /// exception, since news about a note that has left the panel is a toast (decision 176).
     private func hideBanner() {
-        editor.call("hideBanner")
+        editor.send(.hideBanner)
     }
 
     // MARK: - Geometry
@@ -1537,11 +1527,11 @@ final class PanelController: NSObject {
         applySpacePolicy()
         panel.keepsOnTop = settings.value.keepOnTop
         editor.holdsFocusedLook = settings.value.keepOnTop
-        editor.call("setKeepOnTop", [settings.value.keepOnTop])
+        editor.send(.setKeepOnTop(settings.value.keepOnTop))
         applyHiddenFromCapture()
         // Not a setting — panel state — but this runs on `ready`, which is the one moment the web
         // layer needs telling. Its ⌘K label is otherwise wrong until the row is pressed once.
-        editor.call("setAutoSizing", [panelState.autoSizing])
+        editor.send(.setAutoSizing(panelState.autoSizing))
         sendSpaceAssignment()
 
         // The material picks its light or dark variant from the window's appearance, so the two have
@@ -1549,27 +1539,24 @@ final class PanelController: NSObject {
         panel.appearance = settings.value.appearance.nsAppearance
 
         let accent = Settings.accentColours(for: settings.value.accent)
-        editor.call(
-            "applySettings",
-            [[
-                "appearance": settings.value.appearance.rawValue,
-                "accent": accent.light,
-                "accentDark": accent.dark,
-                "textSize": settings.value.textSize,
-                "footerCount": settings.value.footerCount.rawValue,
-                "panelOpacity": settings.value.panelOpacity,
-                "glass": editor.usesGlass,
-                "shortcuts": settings.value.shortcuts,
-                // Decision 19: a theme is a CSS file, so what crosses the bridge is the file's
-                // contents. Read here rather than fetched by the web layer — the page is loaded from
-                // a file URL with read access scoped to the bundle, and widening that scope to reach
-                // Application Support would be a much bigger hole than passing a string.
-                "themeCSS": loadThemeCSS(),
-                // The language in effect; the editor swaps its own catalog (compiled in from the
-                // same `Locales/` files) and re-renders. See `Editor/src/i18n.ts`.
-                "language": L10n.currentLanguage,
-            ]]
-        )
+        editor.send(.applySettings(PanelSettingsPayload(
+            appearance: settings.value.appearance.rawValue,
+            accent: accent.light,
+            accentDark: accent.dark,
+            textSize: settings.value.textSize,
+            footerCount: settings.value.footerCount.rawValue,
+            panelOpacity: settings.value.panelOpacity,
+            glass: editor.usesGlass,
+            shortcuts: settings.value.shortcuts,
+            // Decision 19: a theme is a CSS file, so what crosses the bridge is the file's
+            // contents. Read here rather than fetched by the web layer — the page is loaded from
+            // a file URL with read access scoped to the bundle, and widening that scope to reach
+            // Application Support would be a much bigger hole than passing a string.
+            themeCSS: loadThemeCSS(),
+            // The language in effect; the editor swaps its own catalog (compiled in from the
+            // same `Locales/` files) and re-renders. See `Editor/src/i18n.ts`.
+            language: L10n.currentLanguage
+        )))
 
         // `settings.json` reloads live (decision 32), and the switcher is the one surface whose
         // *content* a setting changes. An open list would otherwise keep the old order until it was
@@ -1589,7 +1576,7 @@ final class PanelController: NSObject {
     private func applyHiddenFromCapture() {
         let hidden = settings.value.hideFromScreenCapture
         panel.sharingType = hidden ? .none : .readOnly
-        editor.call("setHiddenFromCapture", [hidden])
+        editor.send(.setHiddenFromCapture(hidden))
     }
 
     private func setHiddenFromCapture(_ hidden: Bool) {
@@ -1601,10 +1588,7 @@ final class PanelController: NSObject {
         // The one setting in Plume whose effect is invisible *by definition* — it changes what other
         // processes can see, so pressing ⇧⌘H changed nothing at all on screen and the only way to
         // find out whether it had worked was to take a screenshot. Same toast as ⌃X's, decision 50.
-        editor.call(
-            "showToast",
-            [hidden ? tr("toast.hiddenFromCapture") : tr("toast.visibleInCapture")]
-        )
+        editor.send(.showToast(hidden ? tr("toast.hiddenFromCapture") : tr("toast.visibleInCapture")))
     }
 
     // MARK: - Export
@@ -1787,7 +1771,7 @@ extension PanelController: EditorWebViewDelegate {
             case .oneSpace: tr("toast.spaceAssignment.oneSpace", ["number": String(desktop?.number ?? 0)])
             case .everySpace: tr("toast.spaceAssignment.everySpace")
             }
-            editor.call("showToast", [toast])
+            editor.send(.showToast(toast))
 
         case .toggleKeepOnTop:
             // Spelled out before the update, never read inside the closure: see `toggleFooterCount`.
@@ -1796,7 +1780,7 @@ extension PanelController: EditorWebViewDelegate {
             // `settings.update` reaches `applySettings` asynchronously; the click should act at once.
             panel.keepsOnTop = now
             editor.holdsFocusedLook = now
-            editor.call("setKeepOnTop", [now])
+            editor.send(.setKeepOnTop(now))
 
         case .toggleFooterCount:
             // Read out of the store *before* the update, never inside the closure: `settings.update`
@@ -1815,7 +1799,7 @@ extension PanelController: EditorWebViewDelegate {
 
         case .requestDeleted:
             vault.deletedRows { [weak self] rows in
-                self?.editor.callJSON("showDeleted", [EditorWebView.encode(rows)])
+                self?.editor.send(.showDeleted(rows))
             }
 
         case .restoreDeleted(let storedName):
@@ -1848,7 +1832,7 @@ extension PanelController: EditorWebViewDelegate {
                 // one would make clearing several a chore. Re-fetch rather than removing the row in
                 // the web layer, so what is on screen is the folder rather than our idea of it.
                 self.vault.deletedRows { [weak self] rows in
-                    self?.editor.callJSON("showDeleted", [EditorWebView.encode(rows)])
+                    self?.editor.send(.showDeleted(rows))
                 }
             }
 
@@ -1898,7 +1882,7 @@ extension PanelController: EditorWebViewDelegate {
     }
 
     @objc private func chooseHeading(_ sender: NSMenuItem) {
-        editor.call("setHeadingLevel", [sender.tag])
+        editor.send(.setHeadingLevel(sender.tag))
         editor.focusEditor()
     }
 }
@@ -1938,7 +1922,7 @@ extension PanelController: NSWindowDelegate {
         // The mode changed without anyone pressing the row, so the row's label is now a lie until
         // it is told. This is the only path that turns auto-sizing off silently, which is exactly
         // why it is the one that must announce it.
-        editor.call("setAutoSizing", [false])
+        editor.send(.setAutoSizing(false))
     }
 
     /// ⇧⌘/ — frame 2a's thirteenth row, and Raycast's key for it.
@@ -1951,7 +1935,7 @@ extension PanelController: NSWindowDelegate {
         next.manualHeight = next.autoSizing ? nil : Double(panel.frame.height)
         panelState = next
 
-        editor.call("setAutoSizing", [next.autoSizing])
+        editor.send(.setAutoSizing(next.autoSizing))
         applyContentHeight(heightWanted)
         rememberFrame()
     }
@@ -2000,7 +1984,7 @@ extension PanelController: NSWindowDelegate {
         let inside = isPointerOnPanel(NSEvent.mouseLocation)
         if inside != isHovered {
             isHovered = inside
-            editor.call("setHover", [inside])
+            editor.send(.setHover(inside))
         }
         // Outside the guard on purpose: the pointer moving *within* an already-hovered panel is
         // precisely the movement that takes it onto the dot, and an early return here would mean the
@@ -2021,7 +2005,7 @@ extension PanelController: NSWindowDelegate {
     /// and a bare "still inside" tells it nothing about moving from ⌘P to ⌘K.
     private func refreshPointer() {
         guard panel.isSummoned, isHovered, let p = editor.pointerInPage() else { return }
-        editor.call("setPointer", [Double(p.x), Double(p.y)])
+        editor.send(.setPointer(x: Double(p.x), y: Double(p.y)))
     }
 
     /// Decision 107: the close dot lights when the pointer is on it.
@@ -2038,7 +2022,7 @@ extension PanelController: NSWindowDelegate {
             && (editor.closeButtonScreenRect()?.contains(NSEvent.mouseLocation) ?? false)
         guard inside != isCloseHovered else { return }
         isCloseHovered = inside
-        editor.call("setCloseHover", [inside])
+        editor.send(.setCloseHover(inside))
     }
 
     private func refreshAutoSizeBadge() {

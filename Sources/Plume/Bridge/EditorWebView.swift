@@ -140,7 +140,7 @@ final class EditorWebView: NSView {
 
     private func applyFocusedLook() {
         let focused = keyFocused || holdsFocusedLook
-        call("setFocused", [focused])
+        send(.setFocused(focused))
         applyGlassStyle(focused: focused)
     }
 
@@ -266,60 +266,19 @@ final class EditorWebView: NSView {
         for call in queued { webView.evaluateJavaScript(call, completionHandler: nil) }
     }
 
-    /// Calls `window.plumeHost.<method>(...)`.
-    ///
-    /// Arguments are JSON-encoded rather than interpolated: a note containing a backtick, a newline
-    /// or `</script>` is completely ordinary, and string-concatenating one into a JS expression would
-    /// break the editor on exactly the content people write.
-    func call(_ method: String, _ arguments: [Any] = []) {
-        // A closure, not `map(Self.json)`: Swift 6.0, the floor Package.swift names, rejects the
-        // bare reference to a main-actor static here. Newer compilers accept both (reported in #6).
-        let encoded = arguments.map { Self.json($0) }.joined(separator: ", ")
-        let script = "window.plumeHost && window.plumeHost.\(method)(\(encoded));"
-
+    /// Sends one command to the page: `window.plumeHost.<method>(...)`, with its arguments JSON-encoded
+    /// by `EditorCommand`. Queued until the page reports ready, then replayed in order.
+    func send(_ command: EditorCommand) {
+        let script = command.script
         guard isReady else {
             pendingCalls.append(script)
             return
         }
         webView.evaluateJavaScript(script, completionHandler: nil)
-    }
-
-    /// Calls `window.plumeHost.<method>(...)` with arguments that are already JSON.
-    ///
-    /// The switcher's rows go through here: they are `Codable` structs encoded once, rather than
-    /// being converted to `[String: Any]` first so that `call` can convert them straight back.
-    func callJSON(_ method: String, _ jsonArguments: [String]) {
-        let script = "window.plumeHost && window.plumeHost.\(method)(\(jsonArguments.joined(separator: ", ")));"
-        guard isReady else {
-            pendingCalls.append(script)
-            return
-        }
-        webView.evaluateJavaScript(script, completionHandler: nil)
-    }
-
-    static func encode<T: Encodable>(_ value: T) -> String {
-        guard let data = try? JSONEncoder().encode(value),
-              let text = String(data: data, encoding: .utf8)
-        else {
-            return "null"
-        }
-        return text
-    }
-
-    /// Encodes one argument. `JSONSerialization` needs a container at the top level, so scalars go
-    /// through a single-element array and come back out.
-    private static func json(_ value: Any) -> String {
-        guard let data = try? JSONSerialization.data(withJSONObject: [value], options: []),
-              let text = String(data: data, encoding: .utf8),
-              text.count >= 2
-        else {
-            return "null"
-        }
-        return String(text.dropFirst().dropLast())
     }
 
     func focusEditor() {
-        call("focusEditor")
+        send(.focusEditor)
         // The web view has to be first responder before anything inside it can be, and summoning
         // does not go through a click that would set it.
         window?.makeFirstResponder(webView)
