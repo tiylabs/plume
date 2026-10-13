@@ -71,11 +71,18 @@ jobs:
       - name: Check references to unpublished documents
         run: Scripts/check-doc-refs.sh
 
+      # Pinned: a rule added by a newer SwiftLint must not turn an unrelated push red. Bump the
+      # version here and in .swiftlint.yml together, after checking the new rules against the tree.
+      # Not `--strict`: that would promote the warning thresholds (the targets) to failures.
       - name: Lint Swift
+        env:
+          SWIFTLINT_VERSION: 0.63.2
         run: |
-          brew install swiftlint
-          swiftlint version
-          swiftlint lint --quiet
+          curl -fsSL -o swiftlint.zip \
+            "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip"
+          unzip -q swiftlint.zip -d "$RUNNER_TEMP/swiftlint"
+          "$RUNNER_TEMP/swiftlint/swiftlint" version
+          "$RUNNER_TEMP/swiftlint/swiftlint" lint --quiet
 
       # Assembles the real .app, so a break in the bundling script, the Info.plist substitution or
       # the ad-hoc signature fails the build rather than waiting for a release.

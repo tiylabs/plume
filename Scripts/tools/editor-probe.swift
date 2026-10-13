@@ -33,7 +33,7 @@ guard let testSource = try? String(contentsOf: testFile, encoding: .utf8) else {
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 
-// Offscreen, and 460 wide by default because that is `PlumePanel.defaultWidth` — layout has to match
+// Offscreen, and 460 wide by default because that is `PanelWindow.defaultWidth` — layout has to match
 // the panel.
 let window = NSWindow(
     contentRect: NSRect(x: 0, y: 0, width: plumeWidth, height: 600),

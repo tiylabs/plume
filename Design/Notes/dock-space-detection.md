@@ -72,5 +72,5 @@ swift run DockSpaceProbe --bundle com.tiylabs.plume.dev --preferences /tmp/dock-
 - 本机已有的其他应用绑定分别被诊断工具识别为 `oneSpace` 和 `everySpace`；UUID 绑定与系统保存的桌面配置匹配。验证输出不列出其他应用标识。
 - 使用临时 plist 连续验证 `unassigned → everySpace → oneSpace → unassigned → unknown:invalidPropertyList → everySpace`，每次原子替换均被捕获，损坏后恢复读取成功。
 - ⌘K 系统分配菜单调整后，TypeScript 类型检查与应用编译通过；真实 WKWebView 中桌面分配测试在 460pt / 340pt 宽度各通过 59 个断言，380pt 窄窗口测试通过 9 个断言，语言切换测试通过 13 个断言。覆盖主行无系统来源标注、无副标题、三项禁用、系统结果对应项勾选及来源标注、鼠标不触发、键盘跳过、检测实时更新、取消后恢复操作、中英文及文字换行。
-- 使用本机已存在的开发版 Dock 桌面 1 绑定，对真实 `PlumePanel` 先启用全部桌面，再执行策略切换：确认 `.canJoinAllSpaces` 被移除，同一个窗口与停放位置保持，SkyLight 读取的实际归属为桌面 1，UUID 与系统绑定一致。
+- 使用本机已存在的开发版 Dock 桌面 1 绑定，对真实 `PanelWindow` 先启用全部桌面，再执行策略切换：确认 `.canJoinAllSpaces` 被移除，同一个窗口与停放位置保持，SkyLight 读取的实际归属为桌面 1，UUID 与系统绑定一致。
 - 未操作实际 Dock 菜单，尚未测量其偏好落盘延迟；未测试其他 macOS 版本。

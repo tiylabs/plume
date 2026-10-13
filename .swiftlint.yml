@@ -19,11 +19,11 @@ disabled_rules:
 opt_in_rules: []
 
 # Length rules are a ratchet, not a style opinion: the error thresholds sit just above the largest
-# current non-test offender (measured with swiftlint 0.65.1, 2026-10-13) so nothing new can grow past
+# current non-test offender (measured with swiftlint 0.63.2, the version CI pins, 2026-10-13) so nothing new can grow past
 # today's worst, and the warning thresholds are the target. Each phase of
 # Design/Notes/architecture-refactor-plan.md lowers the errors; warnings do not fail the build.
-#   file_length            largest: PlumeController.swift 2092  -> error 1000 after phase 4
-#   type_body_length       largest: PlumeController 950         -> error 700 after phase 4
+#   file_length            largest: PanelController.swift 2092  -> error 1000 after phase 4
+#   type_body_length       largest: PanelController 950         -> error 700 after phase 4
 #   function_body_length   largest: editor(_:didReceive:) 131   -> error 100 after phase 4
 file_length:
   warning: 600
