@@ -33,6 +33,7 @@ runCompatibilityTests()
 runBridgeContractTests()
 runStoreTests()
 runNavigationHistoryTests()
+runNoteSessionTests()
 runVaultServiceTests()
 
 exit(Check.finish())
