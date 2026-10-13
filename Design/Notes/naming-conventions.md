@@ -89,7 +89,7 @@ this repository cannot repair. They are checked by tests; a refactor that touche
 | `plumes` (the panel list in `state.json`), every other key in `state.json` and `settings.json` | the user's disk | `CompatibilityTests` and its fixtures |
 | `pinPlume` (the key of the pin shortcut in `settings.json`) | the user's disk | `CompatibilityTests` |
 | `.plume-*`, `.plume`, `.plume__*`, `#plume*`, `data-plume-*`, and the CSS custom properties | user themes in `~/Library/Application Support/Plume/Themes` | `Editor/tests/theme-contract.mjs`, `theme-api.txt` |
-| `window.plumeHost`, `messageHandlers.plume`, the message and host method names | both ends of the bridge | `Editor/tests/bridge-names.mjs`, `bridge-names.txt` |
+| `window.plumeHost`, `messageHandlers.plume`, the message and host method names | both ends of the bridge | `Tests/PlumeKitTests/Bridge/BridgeContractTests.swift` (reads `Editor/src/bridge/protocol.ts`) |
 | Bundle identifiers, `Plume` and `Plume (Debug)` support folders, the `PlumeScratchBuild` Info.plist key | macOS | CI bundle checks, `Scripts/test-dev-isolation.sh` |
 
 The Swift property that holds the panel list is `AppState.panels`; its `CodingKeys` entry writes it as

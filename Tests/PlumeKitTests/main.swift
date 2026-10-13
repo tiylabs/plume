@@ -30,6 +30,7 @@ runGitSyncRepositoryTests()
 runGitSyncSchedulerTests()
 runLocalizationTests()
 runCompatibilityTests()
+runBridgeContractTests()
 runStoreTests()
 runVaultServiceTests()
 

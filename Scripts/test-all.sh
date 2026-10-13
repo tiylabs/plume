@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Every gate, in one run: the PlumeKit suite, the typecheck, the keyboard tables, and the WKWebView
-# suites against one build of the editor bundle, plus the on-disk and bridge compatibility checks. What CI and the release workflow run, runnable here.
+# Every gate, in one run: the PlumeKit suite (which includes the on-disk formats and the Swift ⇄ web
+# bridge contract), the typecheck, the keyboard tables, the theme contract, and the WKWebView suites
+# against one build of the editor bundle. What CI and the release workflow run, runnable here.
 #
 # THIS IS THE ONLY PLACE THE LIST OF SUITES LIVES. A new suite is added here and nowhere else; CI
 # (.github/workflows/ci.yml) and the release workflow call this script rather than keeping their own
@@ -35,7 +36,6 @@ if [[ "$only" != kit ]]; then
 	step "Typecheck"          bash -c 'cd Editor && npm run --silent typecheck'
 	step "Keyboard tables"    Scripts/test-keyboard.sh
 	step "Theme contract"     bash -c 'cd Editor && node tests/theme-contract.mjs'
-	step "Bridge names"       bash -c 'cd Editor && node tests/bridge-names.mjs'
 	step "Editor bundle"      bash -c 'cd Editor && node build.mjs >/dev/null'
 	# Every WKWebView suite (commands, markdown, switcher, space-assignment, narrow, tooltip, i18n);
 	# the list lives in Scripts/test-web.sh. The bundle was built once, two steps up.
