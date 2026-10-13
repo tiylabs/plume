@@ -64,13 +64,12 @@ pnpm-debug.log*
 markdown-findings.txt
 
 # ---- Local-only working docs ----
-# The decision record and the agent brief stay on this machine. BRIEF.md in particular is written in
-# the first person and carries personal context — what the itch was, what the alternatives cost —
-# that belongs to the author rather than to the repository. Both are still the source of truth for
-# *why*; they are simply not published.
+# The decision record stays on this machine. BRIEF.md is written in the first person and carries
+# personal context — what the itch was, what the alternatives cost — that belongs to the author
+# rather than to the repository. It remains the source of truth for *why*; it is simply not
+# published. AGENTS.md is published: it is a project map, not a personal brief.
 docs/
 CLAUDE.md
-AGENTS.md
 
 # Claude Code's own session state — a checkpoint file and a local output-style preference.
 # Neither is a project file.
