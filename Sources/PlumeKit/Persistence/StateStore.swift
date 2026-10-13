@@ -60,3 +60,25 @@ public final class StateStore {
         }
     }
 }
+
+extension StateStore {
+
+    /// One panel's remembered state, or a blank one for an id that has none yet.
+    public func panelState(id: UUID) -> PanelState {
+        value.panels.first { $0.id == id } ?? PanelState(id: id)
+    }
+
+    /// Changes one panel's state and schedules a save, adding the panel if it was not there. The
+    /// panel is read, changed and written back as one step, so two writers cannot interleave.
+    public func updatePanel(id: UUID, _ body: (inout PanelState) -> Void) {
+        var next = panelState(id: id)
+        body(&next)
+        update { s in
+            if let i = s.panels.firstIndex(where: { $0.id == id }) {
+                s.panels[i] = next
+            } else {
+                s.panels.append(next)
+            }
+        }
+    }
+}

@@ -196,16 +196,8 @@ final class PanelController: NSObject {
     // MARK: - Plume state
 
     private var panelState: PanelState {
-        get { state.value.panels.first { $0.id == panelID } ?? PanelState(id: panelID) }
-        set {
-            state.update { s in
-                if let i = s.panels.firstIndex(where: { $0.id == panelID }) {
-                    s.panels[i] = newValue
-                } else {
-                    s.panels.append(newValue)
-                }
-            }
-        }
+        get { state.panelState(id: panelID) }
+        set { state.updatePanel(id: panelID) { $0 = newValue } }
     }
 
     var isPinned: Bool {
