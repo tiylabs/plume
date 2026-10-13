@@ -172,7 +172,5 @@ extension PanelController {
         session.openLastUsedIfNothingOpen()
     }
     func closeRequested() { dismiss() }
-    func goBack() { session.goBack() }
-    func goForward() { session.goForward() }
     func headingMenuRequested(below button: CGRect, current level: Int?) { showHeadingMenu(below: button, current: level) }
 }
