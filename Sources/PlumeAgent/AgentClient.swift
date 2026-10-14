@@ -208,22 +208,56 @@ public final class AgentClient: @unchecked Sendable {
 
     /// One request, blocking until its answer, a timeout or a lost connection. Thread-safe; any
     /// number may be in flight at once over the one connection.
-    public func call(_ tool: AgentTool, params: JSONValue, timeout: TimeInterval? = nil, id: String? = nil) throws -> JSONValue {
-        try connect()
+    ///
+    /// The request is registered before connecting, and `isCancelled` is asked again just before it
+    /// is sent. Connecting can mean launching Plume and waiting up to `readyTimeout`; a cancel that
+    /// arrived in that wait used to find nothing to cancel — no socket, no waiter — and the write
+    /// was sent once the app was up, with its answer then suppressed. The app has not seen such a
+    /// request yet, so only this side can stop it.
+    public func call(
+        _ tool: AgentTool, params: JSONValue, timeout: TimeInterval? = nil, id: String? = nil,
+        isCancelled: () -> Bool = { false }
+    ) throws -> JSONValue {
         let pending = Pending()
-        let (socket, requestID) = lock.withLock { () -> (IPCSocket?, String) in
+        let requestID = lock.withLock { () -> String in
             counter += 1
             let requestID = id ?? "r\(counter)"
             self.pending[requestID] = pending
-            return (self.socket, requestID)
+            return requestID
         }
-        guard let socket else { throw IPCSocket.connectionLost() }
+        func unregister() { _ = lock.withLock { self.pending.removeValue(forKey: requestID) } }
+
+        guard !isCancelled() else {
+            unregister()
+            throw Self.cancelledBeforeSending()
+        }
         do {
-            try socket.write(IPCMessage.request(id: requestID, method: tool, params: params))
+            try connect()
         } catch {
-            _ = lock.withLock { self.pending.removeValue(forKey: requestID) }
-            dropConnection(socket)
+            unregister()
             throw error
+        }
+        // No longer registered: `cancel(id:)` or a lost connection answered it during the wait, and
+        // the answer is already in `pending`. Nothing is sent.
+        let (registered, socket) = lock.withLock { (self.pending[requestID] === pending, self.socket) }
+        if registered {
+            guard !isCancelled() else {
+                unregister()
+                throw Self.cancelledBeforeSending()
+            }
+            guard let socket else {
+                unregister()
+                throw IPCSocket.connectionLost()
+            }
+            // A cancel from here on is sent after the request or races it; the app keeps a cancel
+            // for an ID it has not seen yet, so either order stops a write before it is prepared.
+            do {
+                try socket.write(IPCMessage.request(id: requestID, method: tool, params: params))
+            } catch {
+                unregister()
+                dropConnection(socket)
+                throw error
+            }
         }
 
         let wait = timeout ?? Self.timeout(for: tool, params: params)
@@ -246,6 +280,10 @@ public final class AgentClient: @unchecked Sendable {
             waiter.result = .failure(AgentFailure(.requestTimeout, "cancelled"))
             waiter.done.signal()
         }
+    }
+
+    static func cancelledBeforeSending() -> AgentFailure {
+        AgentFailure(.requestTimeout, "cancelled before it was sent to Plume; nothing was written", retryable: false)
     }
 
     public static func timeout(for tool: AgentTool, params: JSONValue) -> TimeInterval {

@@ -6,7 +6,10 @@ public protocol AgentCalling: AnyObject, Sendable {
     var permission: AgentPermission? { get }
     var onPermissionChanged: (@Sendable (AgentPermission) -> Void)? { get set }
     @discardableResult func connect() throws -> AgentPermission
-    func call(_ tool: AgentTool, params: JSONValue, timeout: TimeInterval?, id: String?) throws -> JSONValue
+    /// `isCancelled` is asked before the request is sent — after any wait to connect or launch.
+    func call(
+        _ tool: AgentTool, params: JSONValue, timeout: TimeInterval?, id: String?, isCancelled: () -> Bool
+    ) throws -> JSONValue
     func cancel(id: String)
 }
 
@@ -144,9 +147,12 @@ public final class MCPServer: @unchecked Sendable {
         case "notifications/cancelled":
             guard let requestID = params["requestId"] else { return }
             let key = Self.key(requestID)
+            // Only a call still in flight: a cancel for one already answered (or never made) would
+            // otherwise stay in the set and silence a later request that reuses its ID.
             let ipcID = lock.withLock { () -> String? in
+                guard let ipcID = calls[key] else { return nil }
                 cancelled.insert(key)
-                return calls[key]
+                return ipcID
             }
             if let ipcID { backend.cancel(id: ipcID) }
         default:
@@ -204,7 +210,10 @@ public final class MCPServer: @unchecked Sendable {
             defer { inFlightGroup.leave() }
             let outcome: Result<JSONValue, AgentFailure>
             do {
-                outcome = .success(try backend.call(tool, params: arguments, timeout: nil, id: ipcID))
+                outcome = .success(try backend.call(
+                    tool, params: arguments, timeout: nil, id: ipcID,
+                    isCancelled: { lock.withLock { cancelled.contains(key) } }
+                ))
             } catch let failure as AgentFailure {
                 outcome = .failure(failure)
             } catch {

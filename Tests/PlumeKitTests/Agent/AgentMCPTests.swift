@@ -11,15 +11,23 @@ func runAgentMCPTests() {
         var onPermissionChanged: (@Sendable (AgentPermission) -> Void)?
         var answer: (AgentTool, JSONValue) throws -> JSONValue = { tool, params in .object(["tool": .string(tool.rawValue), "echo": params]) }
         var cancelledIDs: [String] = []
+        var sentIDs: [String] = []
         var connectFails = false
         var delay: TimeInterval = 0
+        /// Before sending, as `AgentClient` waits to connect or launch the app.
+        var connectDelay: TimeInterval = 0
 
         func connect() throws -> AgentPermission {
             if connectFails { throw AgentFailure(.authFailed, "no credential") }
             return permission ?? .off
         }
 
-        func call(_ tool: AgentTool, params: JSONValue, timeout: TimeInterval?, id: String?) throws -> JSONValue {
+        func call(
+            _ tool: AgentTool, params: JSONValue, timeout: TimeInterval?, id: String?, isCancelled: () -> Bool
+        ) throws -> JSONValue {
+            if connectDelay > 0 { Thread.sleep(forTimeInterval: connectDelay) }
+            if isCancelled() { throw AgentFailure(.requestTimeout, "cancelled before it was sent") }
+            lock.withLock { sentIDs.append(id ?? "") }
             if delay > 0 { Thread.sleep(forTimeInterval: delay) }
             return try answer(tool, params)
         }
@@ -150,6 +158,31 @@ func runAgentMCPTests() {
             s.waitForCalls()
             Check.equal(out.response(7), nil)
             Check.equal(backend.cancelledIDs.count, 1)
+        }
+
+        Check.test("a call cancelled while the helper is still connecting is never sent") {
+            let backend = FakeBackend()
+            backend.connectDelay = 0.3
+            let (s, out, _) = server(backend)
+            initialize(s)
+            s.handle(line: #"{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"create_note","arguments":{"markdown":"hello","request_id":"u"}}}"#)
+            Thread.sleep(forTimeInterval: 0.05)
+            s.handle(line: #"{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":8,"reason":"user"}}"#)
+            s.waitForCalls()
+            Check.equal(out.response(8), nil)
+            Check.equal(backend.lock.withLock { backend.sentIDs }, [], "not sent at all")
+        }
+
+        Check.test("a cancel for a call that already finished does not silence a later one with the same id") {
+            let (s, out, backend) = server()
+            initialize(s)
+            s.handle(line: #"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"list_notes","arguments":{}}}"#)
+            s.waitForCalls()
+            s.handle(line: #"{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":9}}"#)
+            Check.equal(backend.lock.withLock { backend.cancelledIDs }, [], "nothing in flight to cancel")
+            s.handle(line: #"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"list_notes","arguments":{}}}"#)
+            s.waitForCalls()
+            Check.equal(out.messages.filter { $0["id"] == .number(9) }.count, 2)
         }
 
         Check.test("a permission change after listing sends tools/list_changed") {

@@ -341,6 +341,40 @@ func runAgentIPCTests() {
             Check.expect((received ?? .max) < blob.utf8.count, "the frame was abandoned, not finished: \(received ?? -1) bytes")
         }
 
+        Check.mainTest("a cancel that arrives while the app is still starting stops the request from being sent") {
+            let f = fixture(start: false)
+            final class Seen: @unchecked Sendable {
+                let lock = NSLock()
+                var methods: [String] = []
+            }
+            let seen = Seen()
+            f.server.onRequest = { _, _, method, _, reply in
+                seen.lock.withLock { seen.methods.append(method) }
+                reply(.success(.object([:])))
+            }
+            let server = f.server
+            let client = f.client { _ in
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) {
+                    try? server.start()
+                    server.readiness = .ready
+                }
+                return true
+            }
+            defer { f.server.stop() }
+            // While `call` is still waiting for the launched app to come up.
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { client.cancel(id: "m1") }
+            let failure = offMain { () -> AgentFailure? in
+                do {
+                    _ = try client.call(.createNote, params: .object(["markdown": .string("# x"), "request_id": .string("u")]), timeout: 5, id: "m1")
+                    return nil
+                } catch { return error as? AgentFailure }
+            }
+            Check.equal(failure?.code, .requestTimeout)
+            let later = offMain { try? client.call(.searchNotes, params: .object([:]), timeout: 5, id: "m2") }
+            Check.expect(later != nil, "the connection made meanwhile still serves the next request")
+            Check.equal(seen.lock.withLock { seen.methods }, ["search_notes"], "the cancelled write never reached the app")
+        }
+
         Check.mainTest("a write that times out says it may have been saved and names its request") {
             let failure = AgentClientProbe.timedOut(.createNote, ["request_id": "r-1"])
             Check.equal(failure.code, .requestTimeout)

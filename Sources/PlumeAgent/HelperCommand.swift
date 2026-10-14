@@ -139,7 +139,7 @@ public enum HelperCommand: Equatable {
             output((try? encoder.encode(value)).map { String(decoding: $0, as: UTF8.self) } ?? "null")
         }
         do {
-            print(try backend.call(tool, params: params, timeout: nil, id: nil))
+            print(try backend.call(tool, params: params, timeout: nil, id: nil, isCancelled: { false }))
             return 0
         } catch let failure as AgentFailure {
             print(["error": failure])
