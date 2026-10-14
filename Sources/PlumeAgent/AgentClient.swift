@@ -81,6 +81,8 @@ public final class AgentClient: @unchecked Sendable {
 
         let deadline = Date().addingTimeInterval(AgentLimits.readyTimeout)
         var launched = false
+        var nextLaunchAttempt = Date.distantPast
+        var launchRefusals = 0
         var lastFailure = AgentFailure(.appNotReady, "Plume did not answer in time")
 
         while true {
@@ -104,12 +106,22 @@ public final class AgentClient: @unchecked Sendable {
                 throw AgentFailure(.connectionBlocked, "something that is not Plume's socket is at \(runtime.socketURL.path)")
             case .failure(.notRunning):
                 if let mismatch = otherOwner() { throw mismatch }
-                if !launched, !AgentOwnerLock.isHeld(runtime) {
-                    launched = true
-                    guard launcher(location.appBundle) else {
-                        throw AgentFailure(
+                // A refused launch is retried until the ready deadline, not reported at once. Measured
+                // on macOS 27: for about 0.3 s after Plume exits, `open -g` fails with LaunchServices
+                // error -600 (procNotFound) while the old process is still being unregistered, in
+                // about two of three tries. An agent calling right after Plume quit or updated hit
+                // that and was told its sandbox forbids launching apps. A sandbox that really forbids
+                // it refuses every attempt, so the answer is the same, five seconds later.
+                if !launched, Date() >= nextLaunchAttempt, !AgentOwnerLock.isHeld(runtime) {
+                    if launcher(location.appBundle) {
+                        launched = true
+                        lastFailure = AgentFailure(.appNotReady, "Plume did not answer in time")
+                    } else {
+                        launchRefusals += 1
+                        nextLaunchAttempt = Date().addingTimeInterval(AgentLimits.launchRetryInterval)
+                        lastFailure = AgentFailure(
                             .connectionBlocked,
-                            "could not start \(location.profile.displayName) at \(location.appBundle.path); the agent's sandbox may forbid launching apps — open Plume yourself and retry"
+                            "could not start \(location.profile.displayName) at \(location.appBundle.path) (\(launchRefusals) attempts); the agent's sandbox may forbid launching apps — open Plume yourself and retry"
                         )
                     }
                 }

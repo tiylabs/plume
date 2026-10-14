@@ -63,6 +63,9 @@ public enum AgentLimits {
     public static let operationCompactRetention: TimeInterval = 90 * 24 * 3600
     /// How long the helper waits for a launched app to answer.
     public static let readyTimeout: TimeInterval = 5
+    /// Between launch attempts the system refused, inside `readyTimeout`. The refusal right after
+    /// Plume exits clears within about 0.3 s (measured), so a few retries cover it.
+    public static let launchRetryInterval: TimeInterval = 0.25
     /// An ordinary request, end to end.
     public static let requestTimeout: TimeInterval = 10
     /// A read that asked for an iCloud download. Measured downloads of a tiny file took 5–20 s.

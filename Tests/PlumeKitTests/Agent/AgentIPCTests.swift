@@ -115,15 +115,31 @@ func runAgentIPCTests() {
             Check.equal(launches.value, 0)
         }
 
-        Check.mainTest("app not running: launched once in the background; refusal to launch is CONNECTION_BLOCKED") {
+        Check.mainTest("app not running: launched once in the background; refusal until the deadline is CONNECTION_BLOCKED") {
             let f = fixture(start: false)
             let launches = Launches()
             let refused = f.client { _ in launches.record(); return false }
             Check.equal(code { try refused.connect() }, .connectionBlocked)
-            Check.equal(launches.value, 1)
+            Check.expect(launches.value > 1, "a refused launch is retried before giving up")
+
+            // LaunchServices refuses `open -g` for a moment after the app exits (-600); a refusal
+            // followed by a launch that works must connect, launching exactly once successfully.
+            let flaky = Launches()
+            let server = f.server
+            let retried = f.client { _ in
+                flaky.record()
+                guard flaky.value >= 3 else { return false }
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) {
+                    try? server.start()
+                    server.readiness = .ready
+                }
+                return true
+            }
+            Check.equal(offMain { try? retried.connect() }, .readWrite)
+            Check.equal(flaky.value, 3)
+            f.server.stop()
 
             // The launcher "starts the app": the client waits for it to come up.
-            let server = f.server
             let starting = f.client { _ in
                 DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) {
                     try? server.start()
