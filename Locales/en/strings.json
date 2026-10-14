@@ -380,7 +380,7 @@
   "agent.credential.explanation": "Rotating issues a new credential. Every configured agent stops working until you copy the configuration again.",
   "agent.copy": "Copy",
   "agent.copied": "Copied",
-  "agent.rotate": "Rotate…",
+  "agent.rotate": "Rotate",
   "agent.rotate.title": "Rotate the agent credential?",
   "agent.rotate.detail": "A new credential is issued and the old one stops working at once. Every agent you configured stops working until you give it the new MCP configuration. MCP access stays as it is.",
   "agent.rotate.button": "Rotate",

@@ -372,7 +372,7 @@
   "agent.credential.explanation": "轮转后生成新的凭据，所有已配置的 Agent 都会停止工作，直到你重新拷贝配置。",
   "agent.copy": "拷贝",
   "agent.copied": "已拷贝",
-  "agent.rotate": "轮转…",
+  "agent.rotate": "轮转",
   "agent.rotate.title": "轮转 Agent 凭据？",
   "agent.rotate.detail": "会生成新的凭据，旧凭据立即失效。你配置过的所有 Agent 都会停止工作，直到你把新的 MCP 配置拷贝给它们。MCP 开关保持不变。",
   "agent.rotate.button": "轮转",
