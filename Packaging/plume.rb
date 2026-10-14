@@ -31,7 +31,15 @@ cask "plume" do
     "~/Library/Application Support/Plume/settings.json",
     "~/Library/Application Support/Plume/state.json",
     "~/Library/Application Support/Plume/Themes",
+    # The agent switch and credential are Plume's own leavings, and a credential should not outlive
+    # the app it unlocks.
+    "~/Library/Application Support/Plume/Agent/access.json",
+    "~/Library/Application Support/Plume/Agent/token",
   ]
+
+  # Not zapped from Agent/: preferences.md and Templates are documents the user wrote, and
+  # Operations holds the earlier versions of notes an agent changed — recoverable text, kept for the
+  # same reason Recently Deleted is.
 
   # Deliberately NOT listing the vault, and no longer the Recently Deleted folder either. `zap` is
   # for the app's own leavings, and both of those are the user's documents — the entire premise of
@@ -46,5 +54,10 @@ cask "plume" do
     summon the panel. It downloads and installs nothing, and sends nothing about
     you. Switch the daily one off under Settings > General. Your notes are plain
     .md files in ~/Documents/Plume.
+
+    Agent access (Settings > Agent) is off by default. When you turn it on, the
+    plume-agent helper inside the app talks to Plume over a local Unix socket on
+    this Mac only; it adds no network requests. What your agent does with notes
+    it reads is up to the agent.
   EOS
 end

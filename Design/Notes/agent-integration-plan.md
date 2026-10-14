@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 状态 | v3 设计草案（已对照代码 review 修订，首版范围已收窄），尚未实施 |
+| 状态 | v3 设计，首版实施中：代码在 `feature/agent-integration`，阶段 0 的实测与选择见 [agent-integration-phase0.md](agent-integration-phase0.md) |
 | 日期 | 2026-10-14 |
 | 代码基线 | `99fd7af` |
 | 目标 | 用户在自己的 Agent 中搜索、读取笔记，并按 Plume 格式和个人习惯创建、修改笔记 |

@@ -7,9 +7,11 @@ How code is named and where it lives. These rules describe the code as it is; wh
 
 ```
 Sources/PlumeKit/        Foundation only. Anything that can be tested without a window server.
-  Notes/  Vault/  Session/  Bridge/  GitSync/  Persistence/  Panel/  Input/  Support/
+  Notes/  Vault/  Session/  Bridge/  GitSync/  Persistence/  Panel/  Input/  Support/  Agent/
 Sources/Plume/           AppKit, WebKit, Carbon. The app itself.
   App/  Panel/  Bridge/  Spaces/  MenuBar/  Services/  Settings/
+Sources/PlumeAgent/      The helper's logic (MCP server, CLI, IPC client); Foundation only, tested.
+Sources/PlumeAgentHelper/ The helper's entry point, built as Contents/MacOS/plume-agent.
 Sources/DockSpaceProbe/  A diagnostic executable for Dock "Assign To" detection; not part of the app.
 Tests/PlumeKitTests/     The PlumeKit suite — an executable, not an XCTest target (see Package.swift).
 Editor/src/              The web layer: bridge/  editor/  format/  markdown/  keyboard/  ui/  styles/
@@ -36,6 +38,9 @@ AppKit; if a type needs it, the type belongs in `Sources/Plume`.
 | Git and iCloud | **Sync**; Git types carry the `GitSync` prefix | |
 | Checking for a newer version | **Release** (`ReleaseCheck`, `ReleaseFetcher`) | Update, except in text users read |
 | The development build | **Dev** (`BuildProfile.dev`, "Plume Dev", `Plume-dev`) | Scratch |
+| The user's own AI program | **Agent** — only ever the user's, never Plume's code | Assistant, bot |
+| `plume-agent`, shipped inside the app | **helper** | agent, CLI (the CLI is one of its modes) |
+| One create, modify or restore through the API | **Operation** (`OperationRecord`, `OperationJournal`) | Job, transaction |
 
 `Plume` is the product. It appears in the module name `PlumeKit`, in bundle identifiers and log
 subsystems, in the `plumeHost` bridge object, and in the CSS prefix. It is not a word for "the panel".
@@ -61,7 +66,7 @@ subsystems, in the `plumeHost` bridge object, and in the CSS prefix. It is not a
   New code uses `Coordinator` for something that wires several services together without owning a view,
   `Scheduler` for something that only decides *when*, and a `-ing` suffix for a protocol that is
   injected so a test can replace it (`VaultServicing`, `Scheduling`).
-- Abbreviations are the usual few: `URL`, `ID`, `CSS`, `JSON`, `L10n`.
+- Abbreviations are the usual few: `URL`, `ID`, `CSS`, `JSON`, `L10n`, `MCP`, `IPC`, `CLI`.
 - A test file is `<Subject>Tests.swift` with an entry point `run<Subject>Tests()`. Names such as `More`
   or `Misc` say nothing about what is inside; split by topic instead.
 
@@ -92,6 +97,9 @@ this repository cannot repair. They are checked by tests; a refactor that touche
 | `.plume-*`, `.plume`, `.plume__*`, `#plume*`, `data-plume-*`, and the CSS custom properties | user themes in `~/Library/Application Support/Plume/Themes` | `Editor/tests/theme-contract.mjs`, `theme-api.txt` |
 | `window.plumeHost`, `messageHandlers.plume`, the message and host method names | both ends of the bridge | `Tests/PlumeKitTests/Bridge/BridgeContractTests.swift` (reads `Editor/src/bridge/protocol.ts`) |
 | Bundle identifiers, `Plume` and `Plume (Debug)` support folders, the `PlumeScratchBuild` Info.plist key | macOS | CI bundle checks, `Scripts/test-dev-isolation.sh` |
+| `Contents/MacOS/plume-agent`, its `mcp` subcommand and CLI commands, `PLUME_AGENT_TOKEN` | users' agent configurations | `AgentMCPTests`, `Scripts/smoke/agent-smoke.sh` |
+| The seven tool names, their argument and result fields, the error codes (`AgentErrorCode`) | agents' prompts and scripts | `AgentDomainTests`, `AgentMCPTests` |
+| `Agent/access.json`, `Agent/token`, `Agent/preferences.md`, `Agent/Templates/`, `Agent/Operations/` | the user's disk | `AgentHandlerTests` |
 
 The Swift property that holds the panel list is `AppState.panels`; its `CodingKeys` entry writes it as
 `plumes`. Changing a stored name, when it has to be done, needs all of: reading the old name, a stated
