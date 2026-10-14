@@ -84,10 +84,12 @@ a new suite is added there, not to CI configs):
 
 ## Branching and commits
 
-Two machines, one line: work happens on `dev` and topic branches (`feat/…`, `fix/…`,
-`refactor/…`, `docs/…`, `test/…`, `ci/…`); `main` only moves by fast-forward at a release. A
-topic branch must be fully green before being fast-forwarded onto `dev` — CI runs on every branch
-push for exactly this reason.
+`master` is the main branch and the only long-lived one. Work happens on topic branches cut from
+`master` (`feat/…`, `fix/…`, `refactor/…`, `docs/…`, `test/…`, `ci/…`) and lands through a pull
+request into `master`. A topic branch must be fully green before it is merged — CI runs on every
+branch push and on pull requests for exactly this reason. Releases are tags on `master`; the
+changelog PR (`changelog/vX.Y.Z`) is opened by CI from the tag, so `CHANGELOG.md` is not edited by
+hand.
 
 Commit subjects are checked by CI (`Scripts/check-commit-msg.sh`):
 
