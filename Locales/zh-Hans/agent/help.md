@@ -1,6 +1,6 @@
 Plume 通过应用内的一个小工具，让这台 Mac 上的 AI Agent 使用你的笔记。
 
-1. 选择 Agent 可以做什么：只读，或读取、新建和修改笔记。
+1. 选择 Agent 可以做什么：“仅读取”只能搜索和读取笔记；“读取和写入”还可以新建笔记、修改笔记的一部分。
 2. 如果你的 Agent 支持本地 MCP 服务，点 MCP 配置旁的“拷贝”，粘贴到 Agent 的 MCP 设置中（很多 Agent 里是 "mcpServers" 部分），然后重启 Agent。
 3. 如果你的 Agent 通过 Shell 命令工作，就使用命令行工具，并把凭据放在 PLUME_CLI_TOKEN 中，例如：plume-cli notes search --query "项目"。
 

@@ -1,6 +1,7 @@
 Plume lets an AI agent on this Mac work with your notes through a small helper inside the app.
 
-1. Choose what the agent may do: read notes only, or read, create and change them.
+1. Choose what the agent may do: "Read only" lets it search and read notes; "Read and write" also
+   lets it create notes and change parts of them.
 2. If your agent supports local MCP servers, press Copy next to MCP configuration and paste it
    into the agent's MCP settings (for many agents, an "mcpServers" section). Restart the agent.
 3. If your agent runs shell commands instead, use the command-line helper with the credential in

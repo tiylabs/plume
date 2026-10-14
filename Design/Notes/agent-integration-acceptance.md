@@ -65,7 +65,7 @@
 4. `notes read --ref …`：返回 `NOTE_NOT_AVAILABLE`；加 `--download` 后返回正文，期间 Panel 的保存不受影响。
 
 **M3 · 第三方 Agent 客户端**（剩余，本机未安装客户端）
-1. 设置 → MCP → 选“读取、新建和修改笔记” → MCP 配置旁点“拷贝”。
+1. 设置 → MCP → Agent 访问选“读取和写入” → MCP 配置旁点“拷贝”。
 2. 粘贴到 Claude Code（`claude mcp add-json plume '<配置>'`，或写入 `.mcp.json`）、Claude Desktop、Codex 等常用客户端，然后重启客户端。
 3. 让 Agent 执行“把刚才的讨论整理进 Plume；有相关笔记就更新，没有就新建”，确认依次调用了 context → search → read → modify/create，结果出现在“最近写入”中。
 4. 在 Agent 的 Shell 沙箱中执行 CLI，确认被拦截时返回 `CONNECTION_BLOCKED` 和建议，而不是挂起。

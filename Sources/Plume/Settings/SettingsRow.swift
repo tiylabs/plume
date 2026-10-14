@@ -93,10 +93,11 @@ final class SettingsRow: NSView {
 
     /// Wraps the explanation at the width it actually got.
     ///
-    /// `explanationWidth` is the most it may take, but a wide control takes some of it: the MCP
-    /// tab's access pop-up is sized to "Read, create and change notes", which leaves the English
-    /// explanation narrower than 280. The label still measured its height at 280 — two lines — and
-    /// the third line was cut off. Re-measuring at the real width gives it the lines it needs.
+    /// `explanationWidth` is the most it may take, but a wide control takes some of it. The MCP
+    /// tab's access pop-up, when its longest option was "Read, create and change notes", left the
+    /// English explanation narrower than 280; the label still measured its height at 280 — two
+    /// lines — and the third was cut off. Re-measuring at the real width gives any row the lines it
+    /// needs, whatever control sits beside it.
     override func layout() {
         super.layout()
         let width = explanationLabel.frame.width
