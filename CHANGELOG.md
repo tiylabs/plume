@@ -9,16 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > are recorded in its history, not in this file. The entries below cover this fork only. The project was renamed from Pane to Plume after v0.3.1075;
 > the older entries and their links still use the former name and repository path `tiylabs/pane`.
 
-## [Unreleased]
-### :sparkles: New Features
-- **agent**: ✨ Connect your own AI agent (Settings › Agent). The `plume-agent` helper inside the app
-  is a local stdio MCP server and a CLI that reach the running Plume over a per-user Unix socket, with
-  seven tools: `get_writing_context`, `list_notes`, `search_notes`, `read_note`, `create_note`,
-  `modify_note`, `get_operation`. Off by default; read-only or read-write; versioned partial
-  changes, request-ID idempotency, a recoverable operation journal, and restore from recent writes.
-  New files under Application Support: `Agent/access.json`, `Agent/token`, `Agent/preferences.md`,
-  `Agent/Templates/`, `Agent/Operations/`. No existing setting, state key or file name changed.
-
 ## [v0.5.0] - 2026-10-13
 ### :boom: BREAKING CHANGES
 - due to [`2a1c8ff`](https://github.com/tiylabs/plume/commit/2a1c8ffda76a7e3d218294b061f578b135ad03ef) - ✨ Add three-way desktop assignment to ⌘K *(PR [#6](https://github.com/tiylabs/plume/pull/6) by [@jorben](https://github.com/jorben))*:
