@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 状态 | v3 设计，首版实施中：代码在 `feature/agent-integration`，阶段 0 的实测与选择见 [agent-integration-phase0.md](agent-integration-phase0.md) |
+| 状态 | v3.1，首版代码与自动化验收完成；阶段 0 的实测与选择见 [agent-integration-phase0.md](agent-integration-phase0.md)，验收结果和发布前仍需人工完成的项见 [agent-integration-acceptance.md](agent-integration-acceptance.md) |
 | 日期 | 2026-10-14 |
 | 代码基线 | `99fd7af` |
 | 目标 | 用户在自己的 Agent 中搜索、读取笔记，并按 Plume 格式和个人习惯创建、修改笔记 |
@@ -18,6 +18,7 @@
 | v1 | 2026-10-13 | 初稿 |
 | v2 | 2026-10-14 | 对照代码 review：每次 summon 都会重置撤销历史，⌘Z 承诺收窄到 Panel 可见时；补充 TCC、helper 真实路径与 profile 解析、App Translocation、启动时的 Vault chooser、App Nap、沙箱化 Shell；凭据改存 `0600` 文件；明确行结束、Git 冲突标记、写入速率上限与格式语法；补充 lint 棘轮、命名、打包约束及对应验收项 |
 | v3 | 2026-10-14 | 收窄首版范围：会话当前笔记改为写盘后重载，Panel 有焦点或有未保存输入时返回 `NOTE_BUSY`；读取只返回磁盘内容；首版不提供 ⌘Z 撤销 Agent 修改；编辑器事务、revision 与 barrier 移到第 14.1 节；相应精简操作状态、错误码、阶段与验收项 |
+| v3.1 | 2026-10-14 | 设置页不提供“选择范例”，范例只由 `example_refs` 指定（第 9.2 节）；状态改为首版代码完成，余下手工验收见验收清单 |
 
 ## 1. 目标与关键决定
 
@@ -507,7 +508,7 @@ helper 只从客户端配置获取凭据，不读取应用端的凭据文件；�
 
 - 启用与权限选择。
 - 当前连接状态、复制 MCP 配置、复制 CLI 路径和查看连接说明。
-- 编辑写作偏好、管理模板、选择范例。
+- 编辑写作偏好、管理模板。范例不在设置中维护：用户在对话中把笔记指给 Agent，或由 Agent 按本次任务搜索，再通过 `example_refs` 传入（第 5.2 节）。设置里固定的范例列表会成为新的存储兼容面，而且要靠用户额外维护；首版不提供。
 - 最近写入：时间、调用者显示名、笔记标题、创建/修改/恢复、结果。
 - 定位笔记、查看可恢复版本、清除记录及撤销连接。
 

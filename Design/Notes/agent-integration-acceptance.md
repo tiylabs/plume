@@ -6,7 +6,7 @@
 | 阶段 0 记录 | [agent-integration-phase0.md](agent-integration-phase0.md) |
 | 日期 | 2026-10-14 |
 
-逐行对照第 13 节，记录每一行用什么方式验证、结果如何。“自动”指 `make test-all` 中的测试，引号内为测试名。PlumeKit 套件位于 `Tests/PlumeKitTests/Agent/`，WKWebView 套件为 `Editor/tests/webview/agent.test.js`，端到端检查为 `Scripts/smoke/agent-smoke.sh`。
+逐行对照第 13 节，记录每一行用什么方式验证、结果如何。“自动”指 `make test-all` 中的测试，引号内为测试名。PlumeKit 套件位于 `Tests/PlumeKitTests/Agent/`，WKWebView 套件为 `Editor/tests/webview/agent.test.js`，端到端检查为 `Scripts/smoke/agent-smoke.sh`，AppKit 生命周期检查为 `Scripts/smoke/agent-lifecycle-smoke.sh`（两者都需要 Dev 包，不在 `make test-all` 中）。
 
 ## 1. 逐行对照
 
@@ -24,59 +24,80 @@
 | 10 | 外部写入、删除或改名 | 自动 | “a changed file is a conflict; nothing is written, nothing is recreated”：外部写入返回 `VERSION_CONFLICT`，删除返回 `NOTE_NOT_FOUND` 且不重建；改名后旧 ref 指向的文件不存在，与删除走同一路径 |
 | 11 | Git merge 与 API 同时写 | 自动 | `AgentGitGateTests`（真实临时 Git 仓库，持有 gate 时 commit 等待）；“while Git sync holds the working tree, a write answers NOTE_BUSY (syncing)” |
 | 12 | iCloud evicted 文件 | 自动 + 手工 | `AgentAvailabilityTests`（通过 `VaultService` 的可用性接缝）：列表标记 `evicted`、搜索不读正文并计入 coverage、读取需 `download: true`、下载超时返回 `DOWNLOAD_TIMEOUT`、列表和搜索不触发下载。真实 iCloud 见第 2 节 M2 |
-| 13 | 执行时切换/移动 Vault | 自动 + 手工 | “a vault switch invalidates refs and versions; an old create ID still returns its note”。切换 Vault 与 Move Notes 前会等待已接收的写入完成（`AppCoordinator`、`AgentAccessCoordinator`），这部分为 AppKit 流程，见 M5 |
-| 14 | 修改进行中切换笔记、收起或退出 | 自动 + 手工 | “switching notes during the write: the write finishes, the new note is not reloaded”。退出时 `applicationShouldTerminate` 会等待写入完成；未完成的写入由 journal 在下次启动时结算。收起与退出见 M5 |
-| 15 | 在准备后、文件保存后、journal 结算前崩溃 | 自动 | crash recovery 套件：在 `accepted`、`prepared`、`written` 三处注入中止，再由新 handler 恢复；目标被他人改动时为 `outcome_unknown`；journal 记录损坏时返回 `OUTCOME_UNKNOWN`，不会重新执行 |
+| 13 | 执行时切换/移动 Vault | 自动 + smoke + 手工 | “a vault switch invalidates refs and versions; an old create ID still returns its note”。生命周期 smoke D：在连续写入中改写 `settings.json` 的 `vaultPath`（Settings 与手工编辑走同一条重新指向路径），切换后旧笔记不再变化、没有待定写入、旧 ref 返回 `VAULT_CHANGED`、旧 create ID 返回原操作且新 Vault 中没有第二篇。Move Notes 按钮仍见 M5 |
+| 14 | 修改进行中切换笔记、收起或退出 | 自动 + smoke + 手工 | “switching notes during the write: the write finishes, the new note is not reloaded”。生命周期 smoke B：连续写入中用 `NSRunningApplication.terminate()` 正常退出（与 ⌘Q 同一条 `applicationShouldTerminate` 路径），每个已接收的写入都为 `saved`，已保存的行在笔记中恰好出现一次，重启后无待定记录。收起 Panel 见 M5 |
+| 15 | 在准备后、文件保存后、journal 结算前崩溃 | 自动 + smoke | crash recovery 套件：在 `accepted`、`prepared`、`written` 三处注入中止，再由新 handler 恢复；目标被他人改动时为 `outcome_unknown`；journal 记录损坏时返回 `OUTCOME_UNKNOWN`，不会重新执行。生命周期 smoke C：连续写入中对真实 App `kill -9`，重启后没有 `accepted`/`prepared` 记录，没有一行被追加两次，`get_operation` 与 journal 一致。写入只需约 25 ms，这几次杀进程都没有恰好落在写入中途；中途窗口由上述注入测试覆盖 |
 | 16 | 断连、超时或取消 | 自动 | `AgentIPCTests` “… a lost app fails the waiters”、“a write that times out says it may have been saved and names its request”；`AgentMCPTests` “a cancelled call is forwarded and gets no response”；“a request cancelled before it is prepared writes nothing” |
 | 17 | 权限撤销 | 自动 | “off, read-only and a revoked generation are refused per request”、“a revoke during a prepared write lets that write settle; the next request is refused”；清除记录会同时轮换凭据（“a damaged journal record …”中有断言） |
 | 18 | 正式版/Dev、多个安装副本 | 自动 | `AgentIPCTests` “one owner per profile …”、实例不匹配返回 `APP_INSTANCE_MISMATCH`、release 与 dev 使用不同 socket；现有 `Scripts/test-dev-isolation.sh` |
 | 19 | helper 经符号链接运行、在 bundle 外运行，或 App 被 translocate | 自动 | install location 套件；Dev 包中 `.build/` 下的产物会拒绝运行（退出码 2，已实测） |
 | 20 | 未配置凭据的调用 | 自动 + smoke | “no credential: AUTH_FAILED at once, and the app is not launched”；smoke 中实测 App 未被拉起 |
-| 21 | 启动时 Vault 缺失 | 自动 + 手工 | “… vault missing …”：1 秒内收到 `VAULT_UNAVAILABLE`；listener 先于 Vault 准备启动。chooser 交互见 M4 |
+| 21 | 启动时 Vault 缺失 | 自动 + smoke + 手工 | “… vault missing …”：1 秒内收到 `VAULT_UNAVAILABLE`；listener 先于 Vault 准备启动。生命周期 smoke A：helper 拉起真实 App，0.18–0.71 s 收到不可重试的 `VAULT_UNAVAILABLE`，chooser 弹出期间再次调用 8 ms 内应答，缺失的路径未被重建。在 chooser 中选择文件夹之后的部分见 M4 |
 | 22 | 含 Git 冲突标记的笔记 | 自动 | 读取返回 `git_conflict_markers` 警告；搜索结果带 `has_conflict_markers`；写入时的格式警告同样会标出 |
 | 23 | 写入速率超限 | 自动 | “over the write limit: RATE_LIMITED, not queued; a replay is free”；领域测试检查 `retry_after` |
 | 24 | 路径穿越、符号链接、超长或畸形 JSON | 自动 | “read refuses what is not a note in the vault”、“list and search never read a link pointing outside the vault”、ref/path policy 测试、“strict frames …”、MCP 协议错误测试 |
 | 25 | emoji、组合字符、CRLF | 自动 | change planner 的 grapheme 与 CRLF 用例；“a partial change keeps everything else byte for byte, CRLF included”（中间行保留 CRLF；最后一个换行按加载规则规范化） |
 | 26 | 用户偏好、模板或范例含指令 | 自动 + 手工 | “instructions inside notes are data: they change no permission”；工具说明与格式指引都写明来源；第三方客户端见 M3 |
-| 27 | 发布包 | 部分自动 + 手工 | Dev 包：helper 为 `x86_64 arm64`，`codesign --verify --deep --strict` 通过，smoke 通过。release workflow 已改为按架构构建并合并 helper，并检查架构与签名。Developer ID 签名、公证见 M1 |
+| 27 | 发布包 | 部分自动 + 手工 | Dev 包：helper 为 `x86_64 arm64`，`codesign --verify --deep --strict` 通过，smoke 通过。release workflow 已改为按架构构建并合并 helper，并检查架构与签名。本机 Developer ID 签名已验证（M1 第 1–2 步），公证由 release workflow 完成 |
 
 另外，格式指引中的每条渲染声明都在 WKWebView `agent` 套件中有对应用例，共 23 条断言；为确认套件确实能失败，曾故意改坏两条期望，均被检出。
 
-## 2. 需要 Jorben 手工完成
+## 2. 手工与半自动项
 
-不阻塞首版完成，但发布前需要做。每项都只用 Dev 包或临时 Vault，除 M1 外不涉及正式版数据。
+每项都只用 Dev 包或临时 Vault，除 M1 外不涉及正式版数据。M1、M4、M5 中能脚本化的部分已于 2026-10-14 完成，结果写在各项下；剩余步骤需要 Jorben 本人操作，不阻塞首版完成，但发布前需要做。
 
 **M1 · Developer ID 签名与公证**
-1. 在 release 流程（或本机带 `PLUME_SIGN_IDENTITY`）执行 `Scripts/build-app.sh --universal`。
-2. `codesign -dv --verbose=4 Plume.app/Contents/MacOS/plume-agent`：确认 hardened runtime、时间戳，标识为 `com.tiylabs.plume.agent`。
-3. 执行 `Scripts/notarize.sh`；`xcrun stapler validate Plume.app`、`spctl --assess --type execute Plume.app` 均通过。
-4. 在一台干净的 Mac 上安装 DMG，通过 helper 路径运行 `plume-agent --version`，确认 Gatekeeper 不拦截。
 
-**M2 · 真实 iCloud 驱逐**
+已完成（本机，2026-10-14）：
+- `PLUME_SIGN_IDENTITY='Developer ID Application: BINBIN ZHU (3Y76W6673W)' Scripts/build-app.sh --universal` 通过。
+- `plume-agent`：`x86_64 arm64`，`Identifier=com.tiylabs.plume.agent`，`flags=0x10000(runtime)`，带 secure timestamp，TeamIdentifier `3Y76W6673W`；App 本体同样启用 hardened runtime。
+- `codesign --verify --deep --strict build/Plume.app` 通过；`plume-agent --version` 正常输出。
+- `spctl --assess` 返回 `rejected (Unnotarized Developer ID)`，符合预期：本机没有 notarytool 凭据，公证按约定交给 release workflow。
+
+剩余：
+1. 由 release workflow 执行公证（`Scripts/notarize.sh`），确认 `xcrun stapler validate` 与 `spctl --assess --type execute` 通过。
+2. 在一台干净的 Mac 上安装 DMG，通过 helper 路径运行 `plume-agent --version`，确认 Gatekeeper 不拦截。
+
+**M2 · 真实 iCloud 驱逐**（剩余，需要能访问 iCloud Drive 的终端）
 1. Dev 包的 Vault 设为 `~/Library/Mobile Documents/com~apple~CloudDocs/Plume-dev`，写入一篇含关键字的笔记。
-2. Finder 中对该文件选“移除下载项”。
+2. Finder 中对该文件选“移除下载项”，或执行 `brctl evict <文件>`。
 3. `plume-agent notes list`：该笔记的 `availability` 为 `evicted`；`notes search --query <关键字>`：只能按标题找到，`bodies_not_searched ≥ 1`。
 4. `notes read --ref …`：返回 `NOTE_NOT_AVAILABLE`；加 `--download` 后返回正文，期间 Panel 的保存不受影响。
 
-**M3 · 第三方 Agent 客户端**
+**M3 · 第三方 Agent 客户端**（剩余，本机未安装客户端）
 1. 设置 → Agent → 选“读取、新建和修改笔记” → MCP 配置旁点“拷贝”。
 2. 粘贴到 Claude Code（`claude mcp add-json plume '<配置>'`，或写入 `.mcp.json`）、Claude Desktop、Codex 等常用客户端，然后重启客户端。
 3. 让 Agent 执行“把刚才的讨论整理进 Plume；有相关笔记就更新，没有就新建”，确认依次调用了 context → search → read → modify/create，结果出现在“最近写入”中。
 4. 在 Agent 的 Shell 沙箱中执行 CLI，确认被拦截时返回 `CONNECTION_BLOCKED` 和建议，而不是挂起。
 
 **M4 · 启动时的 Vault chooser**
-1. 退出 Plume Dev，把 Dev 的 Vault 文件夹改名。
-2. 在终端用带凭据的 `plume-agent notes list` 拉起 App：命令应在 1 秒内返回 `VAULT_UNAVAILABLE`；屏幕上出现现有的 chooser。
-3. 选择文件夹后再次执行命令，应正常返回。
+
+已完成：生命周期 smoke A（见第 1 节第 21 行）。
+
+剩余：在弹出的 chooser 中实际选择一个文件夹，再执行 `plume-agent notes list`，应正常返回。选择文件夹需要操作系统的打开面板，脚本无法代替。
 
 **M5 · 写入进行中的 AppKit 流程**
-1. 用 `Scripts/smoke/agent-smoke.sh` 的方式准备 Dev 包与临时 Vault。
-2. 连续发起修改的同时执行：收起 Panel、⌘Q 退出、在设置中 Move Notes。
-3. 预期：已接收的写入完成并在“最近写入”中显示为已保存，或在下次启动时被结算；Move Notes 不会把写入落到旧文件夹。
 
-**M6 · 设置页外观**
+已完成：正常退出（smoke B）、`kill -9`（smoke C）、运行中切换 Vault（smoke D），见第 1 节第 13–15 行。
+
+剩余：
+1. 用 `Scripts/smoke/agent-smoke.sh` 的方式准备 Dev 包与临时 Vault。
+2. 连续发起修改的同时：收起 Panel；在设置中点 Move Notes。
+3. 预期：已接收的写入完成并在“最近写入”中显示为已保存；Move Notes 不会把写入落到旧文件夹。
+
+**M6 · 设置页外观**（剩余）
+
 按 [Settings 窗口设计规范](../Specs/settings-design-spec.md) 第 7 节，分别在浅色和深色下截图 Agent 页：控件右缘对齐、行高 ≥ 40；中英文都不截断。
 
-## 3. 门禁结果
+## 3. 实测中发现并修复的问题
 
-记录在提交说明与本文对应的提交中：`make test-all`、`make lint`（本机 SwiftLint 0.65.1，0 错误）、`Scripts/check-doc-refs.sh`、Dev 包 codesign 与 smoke。SwiftLint 0.63.2 的固定版本检查和 MCP SDK 实测都需要联网，等待授权（见阶段 0 记录第 7 节）。
+**刚退出后立即调用，被误报为 `CONNECTION_BLOCKED`。** 生命周期 smoke 在 App 退出后立刻再次调用时失败。实测（macOS 27，6 次）：App 退出后约 0.3 s 内，`open -g` 有约三分之二的概率以 LaunchServices 错误 -600 失败，此时旧进程还在注销。原实现只尝试启动一次，失败就报告“Agent 的沙箱可能禁止启动 App”，所以 Agent 刚在 Plume 退出或更新后调用时会收到错误的建议。现改为在 5 秒的就绪期限内每 0.25 s 重试一次启动（`AgentLimits.launchRetryInterval`）；真正禁止启动的沙箱每次都会拒绝，结果仍是 `CONNECTION_BLOCKED`，只是在期限到达时才返回。`AgentIPCTests` 新增“被拒绝两次后第三次启动成功”的用例。
+
+## 4. 门禁结果
+
+2026-10-14，分支 `feature/agent-integration`：
+- `make test-all`：全部套件通过（PlumeKit 682 tests / 4339 assertions，WKWebView 各套件，含 `agent` 23 条断言）。
+- SwiftLint 0.63.2（CI 固定版本）：0 错误、45 条警告，警告不导致失败。
+- `Scripts/check-doc-refs.sh` 通过。
+- `Scripts/smoke/agent-smoke.sh`、`Scripts/smoke/agent-lifecycle-smoke.sh`：Dev 包上各连续通过两次。
+- MCP SDK 实测见阶段 0 记录第 1.2 节。

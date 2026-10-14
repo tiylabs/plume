@@ -17,18 +17,20 @@
 
 ### 1.2 对比
 
-| 对比项（方案 3.4） | 维护中的 Swift MCP SDK | 最小 stdio 实现（已采用） |
+| 对比项（方案 3.4） | 官方 Swift MCP SDK `modelcontextprotocol/swift-sdk` 0.12.1（已实测） | 最小 stdio 实现（已采用） |
 |---|---|---|
-| stdio | 支持 | 支持，约 280 行，`AgentMCPTests` 覆盖 |
-| 初始化 / 能力协商 | 完整 | 只声明 `tools.listChanged`；未知版本回落到最新支持版本 |
+| stdio | `StdioTransport`；探针 server 的 `initialize` 与 `tools/list` 应答正确 | 支持，约 280 行，`AgentMCPTests` 覆盖 |
+| 初始化 / 能力协商 | 完整；支持 `2025-11-25`、`2025-06-18`、`2025-03-26`、`2024-11-05` | 只声明 `tools.listChanged`；未知版本回落到最新支持版本 |
 | tools schema | 由 SDK 类型生成 | `MCPToolCatalog` 手写 JSON Schema，与 `AgentTool` 同源 |
-| 错误与取消 | 完整 | 业务失败为 `isError` 工具结果并保留错误码；协议错误 -32700/-32600/-32601/-32602；取消后不再应答 |
-| macOS 14 | 需核对 SDK 的最低平台 | Foundation only，macOS 14 |
-| 仅 CLI Tools、离线构建 | 首次构建需联网解析，新增 `Package.resolved` | 无第三方依赖，离线可构建（已实测） |
-| 二进制体积 | 额外链接 SDK 及其依赖（日志、HTTP/SSE transport 等） | helper 为 universal 二进制，无额外依赖 |
-| 许可证 | 新增 `THIRD_PARTY_NOTICES.md` 条目 | 无变化 |
+| 错误与取消 | 完整，处理 `notifications/cancelled`，取消后不再应答 | 业务失败为 `isError` 工具结果并保留错误码；协议错误 -32700/-32600/-32601/-32602；取消后不再应答 |
+| macOS 14 | 最低 macOS 13；manifest 要求 `swift-tools-version:6.1`，高于本仓库的 6.0 | Foundation only，macOS 14 |
+| 仅 CLI Tools、离线构建 | 首次 `swift package resolve` 联网 24 s，拉取 7 个包、34 MB 源码：swift-sdk、swift-log、swift-system、eventsource、swift-nio、swift-atomics、swift-collections（swift-nio 只被 SDK 自带的 conformance 可执行目标使用，但仍进入 `Package.resolved`）；manifest 还以 `branch: "main"` 声明 swift-docc-plugin（本次以 `exact: "0.12.1"` 解析时未进入 `Package.resolved`） | 无第三方依赖，离线可构建（已实测） |
+| 二进制体积 | 一个只有一个工具的探针 server，universal release：9.3 MB，strip 后 4.2 MB；额外链接 `Network.framework` 与 `libc++` | 完整的 `plume-agent`（含 PlumeKit 的 IPC 客户端、CLI 与 MCP），universal release：6.7 MB，strip 后 3.6 MB |
+| 许可证 | 处于 MIT → Apache-2.0 的过渡期，按贡献者分别适用；需新增 `THIRD_PARTY_NOTICES.md` 条目，并覆盖 swift-log、swift-system、eventsource 等传递依赖 | 无变化 |
 
-**SDK 一栏未做实测。** 读取 SDK 源码、测量其构建与体积需要联网，本次会话还没有得到 Jorben 的授权（见第 7 节）。左栏的依赖与许可证描述来自对上游项目的一般了解，未在本机核对。采用自实现的依据只依赖右栏已实测的事实：首版只需要 tools，自实现已满足需要，并且保持零依赖、可离线构建。以后若需要 resources、prompts 或 HTTP transport（方案第 14 节），再重新评估 SDK。
+测量（2026-10-14）：SDK 取 tag `0.12.1`（`a0ae212`）；构建工具链为 Xcode 的 Swift 6.2.3，`swift build -c release --arch arm64 --arch x86_64`，SDK 探针与 `plume-agent` 用同一命令、各自独立的 scratch 目录。本机切换到 CLI Tools 的 Swift 6.4（`DEVELOPER_DIR=/Library/Developer/CommandLineTools`）时，链接任何 manifest 都失败，包括本仓库自己的 `Package.swift`，属本机工具链安装问题，与 SDK 无关，因此两边都改用 Xcode 工具链比较。
+
+结论不变：首版只需要 tools，自实现已满足需要，同时保持零依赖、离线可构建、体积更小，并且不必维护许可证过渡期的声明与 7 个传递依赖的版本。以后若需要 resources、prompts 或 HTTP transport（方案第 14 节），再重新评估 SDK。
 
 ## 2. helper 的路径与 profile 解析
 
@@ -85,7 +87,7 @@
 
 端到端 smoke 脚本：`Scripts/smoke/agent-smoke.sh`。脚本会备份并恢复 `Plume (Debug)` 支持目录，只使用临时 Vault。
 
-## 7. 未完成项
+## 7. 补测记录
 
-- MCP SDK 实测：需要联网，等待授权（第 1.2 节）。
-- SwiftLint 0.63.2：本机安装的是 0.65.1，`make lint` 在 0.65.1 下为 0 错误；固定版本仍需下载验证。
+- MCP SDK 实测：已于 2026-10-14 完成，见第 1.2 节。
+- SwiftLint 0.63.2（CI 固定版本）：`swiftlint lint --quiet` 为 0 错误、45 条警告；按 CI 规则，警告不导致失败。`NoteSession.swift` 仍为 727 行，与基线 `99fd7af` 相同，低于 `file_length` 错误阈值 800。
