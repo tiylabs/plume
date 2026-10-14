@@ -124,7 +124,13 @@ final class AgentAccessCoordinator {
 
     func vaultChanged(_ url: URL) {
         handler?.setVault(url)
-        if server?.readiness == .vaultUnavailable, handler != nil { server?.readiness = .ready }
+    }
+
+    /// A folder was chosen in the chooser. Before the first `attach` the app is still starting; after
+    /// it, the same folder may have been chosen again, which `vaultChanged` would not report.
+    func vaultChosen() {
+        guard server?.readiness == .vaultUnavailable else { return }
+        server?.readiness = handler == nil ? .starting : .ready
     }
 
     /// Move Notes moves files on the main thread. New writes answer "retry" until the move and the

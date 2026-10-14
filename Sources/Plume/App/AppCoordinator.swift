@@ -57,9 +57,11 @@ final class AppCoordinator {
         agentAccess.start()
 
         vaultCoordinator.resumeLaunch = { [weak self] in self?.start() }
-        // prepare() may enter a modal chooser before it returns; the socket threads must already
-        // know that state while the main actor is inside the chooser.
-        agentAccess.vaultUnavailable()
+        // prepare() may run the chooser's modal loop before it returns; the socket threads are told
+        // from inside it, and only then — a vault that is fine must read as "starting", which a
+        // helper retries, not as "unavailable", which it does not.
+        vaultCoordinator.onChooserPresented = { [weak self] in self?.agentAccess.vaultUnavailable() }
+        vaultCoordinator.onChooserResolved = { [weak self] in self?.agentAccess.vaultChosen() }
         guard vaultCoordinator.prepare() else { return }
 
         vault = VaultService(vault: settings.value.vaultURL)
