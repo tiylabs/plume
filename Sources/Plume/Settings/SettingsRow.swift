@@ -91,6 +91,22 @@ final class SettingsRow: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    /// Wraps the explanation at the width it actually got.
+    ///
+    /// `explanationWidth` is the most it may take, but a wide control takes some of it: the MCP
+    /// tab's access pop-up is sized to "Read, create and change notes", which leaves the English
+    /// explanation narrower than 280. The label still measured its height at 280 — two lines — and
+    /// the third line was cut off. Re-measuring at the real width gives it the lines it needs.
+    override func layout() {
+        super.layout()
+        let width = explanationLabel.frame.width
+        guard !explanationLabel.isHidden, width > 0,
+              abs(explanationLabel.preferredMaxLayoutWidth - width) > 0.5 else { return }
+        explanationLabel.preferredMaxLayoutWidth = min(width, SettingsForm.explanationWidth)
+        explanationLabel.invalidateIntrinsicContentSize()
+        needsLayout = true
+    }
+
     private func embed(_ content: NSView) {
         content.translatesAutoresizingMaskIntoConstraints = false
         addSubview(content)
