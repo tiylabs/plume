@@ -1,11 +1,16 @@
 import AppKit
 import PlumeKit
 
-/// The Agent tab: whether a local AI agent may use the notes, how to connect one, the writing files
+/// The MCP tab: whether a local AI agent may use the notes, how to connect one, the writing files
 /// it reads, and what it has written.
 ///
+/// Named for the protocol rather than for "agent": MCP is the word on the agent's own settings
+/// screen, the thing a person is looking for when they come here to connect one. The type keeps
+/// the Agent name, because the feature is agent access and MCP is one of its two ways in.
+///
 /// Laid out like every other tab (page → cards → rows). It scrolls, like Shortcuts, because the
-/// recent-writes list grows; the window stays the size the other tabs agree on.
+/// recent-writes list grows; the window stays the size the other tabs agree on. With access off
+/// the page is two rows tall, and stays at the top (`SettingsForm.embed(in:)`).
 ///
 /// The credential is never shown on screen. It reaches the pasteboard only when the person presses
 /// Copy, inside the configuration it belongs to, so a screenshot of this tab leaks nothing.
@@ -25,20 +30,14 @@ final class AgentSettingsViewController: NSViewController {
     init(agent: AgentAccessCoordinator) {
         self.agent = agent
         super.init(nibName: nil, bundle: nil)
-        title = tr("settings.tab.agent")
+        title = tr("settings.tab.mcp")
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not used") }
 
     override func loadView() {
-        scroll = NSScrollView()
-        // Same as Shortcuts: the window background, so the toolbar's scroll-edge look matches.
-        scroll.drawsBackground = true
-        scroll.backgroundColor = .windowBackgroundColor
-        scroll.hasVerticalScroller = true
-        scroll.autohidesScrollers = true
-        scroll.horizontalScrollElasticity = .none
+        scroll = SettingsForm.scrollView()
         view = scroll
         rebuild()
     }
@@ -123,14 +122,7 @@ final class AgentSettingsViewController: NSViewController {
         }
 
         form.footnote(tr("agent.privacy"))
-
-        let container = form.makeContentView()
-        scroll.documentView = container
-        container.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            container.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
-            container.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
-        ])
+        form.embed(in: scroll)
     }
 
     private func row(for record: OperationRecord) -> NSView {

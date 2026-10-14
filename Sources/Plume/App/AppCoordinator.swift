@@ -20,7 +20,7 @@ final class AppCoordinator {
     private var menuBar: MenuBarController!
     private var hotkey: GlobalHotkey!
     private let gitSync = GitSyncController()
-    /// The local agent API (Settings → Connect Your Agent). Started before the vault is resolved.
+    /// The local agent API (Settings → MCP). Started before the vault is resolved.
     let agentAccess = AgentAccessCoordinator()
     private var settingsWindow: SettingsWindowController?
 

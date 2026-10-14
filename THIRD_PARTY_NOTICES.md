@@ -73,3 +73,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
+
+## Model Context Protocol mark
+
+The icon of the Settings window's MCP tab (`Sources/Plume/Settings/MCPMark.swift`) is drawn from
+the Model Context Protocol logo in
+[modelcontextprotocol/modelcontextprotocol](https://github.com/modelcontextprotocol/modelcontextprotocol)
+(`docs/logo/light.svg`), whose documentation is licensed under CC-BY-4.0. It is used to label the
+protocol Plume implements; it does not imply that the Model Context Protocol project endorses Plume.

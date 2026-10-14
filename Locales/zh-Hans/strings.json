@@ -356,7 +356,7 @@
   "toast.agentUpdated": "已由 Agent 更新",
   "news.agentUpdated": "Agent 更新了这篇笔记",
   "news.agentUpdatedTitled": "Agent 更新了「{title}」",
-  "settings.tab.agent": "Agent",
+  "settings.tab.mcp": "MCP",
   "agent.access": "Agent 访问",
   "agent.access.explanation": "允许这台 Mac 上的 AI Agent 读取你的笔记，并在你允许时新建和修改笔记。",
   "agent.access.off": "关闭",

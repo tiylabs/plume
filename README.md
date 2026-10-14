@@ -48,7 +48,7 @@ and drag `Plume.app` into `Applications`. Releases are signed and notarized by A
   sides edited a note, Git's conflict markers are left in it, a yellow dot appears on the menu bar icon,
   and syncing resumes once you remove them. A failed sync shows a red dot.
 - **Themes.** A theme is a CSS file in `~/Library/Application Support/Plume/Themes`.
-- **Connect your agent.** Turn it on under Settings › Agent and your own AI agent can search and read
+- **Connect your agent.** Turn it on under Settings › MCP and your own AI agent can search and read
   notes, and create or partly change them following your writing preferences and templates, through
   the `plume-cli` helper inside the app (a local MCP server or a command line). Off by default,
   read-only available, and every write is listed and can be restored.

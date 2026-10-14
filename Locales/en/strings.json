@@ -364,7 +364,7 @@
   "toast.agentUpdated": "Updated by your agent",
   "news.agentUpdated": "Your agent updated this note",
   "news.agentUpdatedTitled": "Your agent updated “{title}”",
-  "settings.tab.agent": "Agent",
+  "settings.tab.mcp": "MCP",
   "agent.access": "Agent access",
   "agent.access.explanation": "Lets an AI agent on this Mac read your notes and, if you allow it, create and change them.",
   "agent.access.off": "Off",

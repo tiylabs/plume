@@ -18,7 +18,7 @@
 | v1 | 2026-10-13 | 初稿 |
 | v2 | 2026-10-14 | 对照代码 review：每次 summon 都会重置撤销历史，⌘Z 承诺收窄到 Panel 可见时；补充 TCC、helper 真实路径与 profile 解析、App Translocation、启动时的 Vault chooser、App Nap、沙箱化 Shell；凭据改存 `0600` 文件；明确行结束、Git 冲突标记、写入速率上限与格式语法；补充 lint 棘轮、命名、打包约束及对应验收项 |
 | v3 | 2026-10-14 | 收窄首版范围：会话当前笔记改为写盘后重载，Panel 有焦点或有未保存输入时返回 `NOTE_BUSY`；读取只返回磁盘内容；首版不提供 ⌘Z 撤销 Agent 修改；编辑器事务、revision 与 barrier 移到第 14.1 节；相应精简操作状态、错误码、阶段与验收项 |
-| v3.1 | 2026-10-14 | 设置页不提供“选择范例”，范例只由 `example_refs` 指定（第 9.2 节）；状态改为首版代码完成，余下手工验收见验收清单；发布前把 helper 由 `plume-agent` 改名为 `plume-cli`、凭据变量由 `PLUME_AGENT_TOKEN` 改为 `PLUME_CLI_TOKEN`（理由见[命名约定](naming-conventions.md)） |
+| v3.1 | 2026-10-14 | 设置页不提供“选择范例”，范例只由 `example_refs` 指定（第 9.2 节）；状态改为首版代码完成，余下手工验收见验收清单；发布前把 helper 由 `plume-agent` 改名为 `plume-cli`、凭据变量由 `PLUME_AGENT_TOKEN` 改为 `PLUME_CLI_TOKEN`（理由见[命名约定](naming-conventions.md)）；设置页 tab 由 Agent 改名为 MCP，换用 MCP 标志 |
 
 ## 1. 目标与关键决定
 
@@ -504,7 +504,7 @@ helper 只从客户端配置获取凭据，不读取应用端的凭据文件；�
 
 ### 9.2 设置入口
 
-在设置窗口新增“连接你的 Agent” tab（暂定 `settings.tab.agent`），布局按 [Settings 窗口设计规范](../Specs/settings-design-spec.md) 的页 → 卡片 → 行，至少包括：
+在设置窗口新增“MCP” tab（`settings.tab.mcp`，图标用 MCP 官方标志；最初拟名“连接你的 Agent”），布局按 [Settings 窗口设计规范](../Specs/settings-design-spec.md) 的页 → 卡片 → 行，至少包括：
 
 - 启用与权限选择。
 - 当前连接状态、复制 MCP 配置、复制 CLI 路径和查看连接说明。

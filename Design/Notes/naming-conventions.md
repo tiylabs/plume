@@ -45,8 +45,10 @@ AppKit; if a type needs it, the type belongs in `Sources/Plume`.
 The helper's file is `plume-cli`, not `plume-agent`: it is the tool an agent calls, not an agent, and
 **Agent** is reserved for the user's program. Not plain `plume` either: APFS is case-insensitive by
 default, so `Contents/MacOS/plume` would be the same file as the app's own `Contents/MacOS/Plume`.
-Its credential variable follows the file name (`PLUME_CLI_TOKEN`); the feature, the Settings tab and
-the Swift modules keep **Agent**, because that is what they are about.
+Its credential variable follows the file name (`PLUME_CLI_TOKEN`). The Settings tab is labelled
+**MCP** (`settings.tab.mcp`), with the protocol's mark: that is the word on an agent's own settings
+screen, and what a person looks for when they come to connect one. The feature, its `agent.*`
+strings and the Swift modules keep **Agent**, because agent access is what they are about.
 
 `Plume` is the product. It appears in the module name `PlumeKit`, in bundle identifiers and log
 subsystems, in the `plumeHost` bridge object, and in the CSS prefix. It is not a word for "the panel".

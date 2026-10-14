@@ -75,7 +75,7 @@ public final class AgentClient: @unchecked Sendable {
         guard let token, !token.isEmpty else {
             throw AgentFailure(
                 .authFailed,
-                "no credential: set \(AgentAPI.tokenEnvironmentKey) to the value shown in Plume's settings (Connect Your Agent)"
+                "no credential: set \(AgentAPI.tokenEnvironmentKey) to the value shown in Plume's settings (MCP)"
             )
         }
 

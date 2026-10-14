@@ -54,15 +54,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         let tabs = NSTabViewController()
         tabs.tabStyle = .toolbar
-        for controller in [general, storage, appearance, shortcuts, agent, about] as [NSViewController] {
+        for controller in [general, storage, agent, appearance, shortcuts, about] as [NSViewController] {
             tabs.addTabViewItem(NSTabViewItem(viewController: controller))
         }
         // SF Symbols matching the frame's own glyphs: gear, folder, half-filled circle, keyboard.
         // About is the one tab the frames do not draw, and takes the system's own about glyph.
-        // The Agent tab takes the system's "connected" glyph: it is about another program joining in.
-        let symbols = ["gearshape", "folder", "circle.lefthalf.filled", "keyboard", "point.3.connected.trianglepath.dotted", "info.circle"]
+        // MCP has no SF Symbol; it takes the protocol's own mark, drawn as a template image so the
+        // toolbar tints it like the symbols beside it (`MCPMark`). It sits after Storage: both are
+        // about where the notes go and who else may reach them, ahead of how the panel looks.
+        let symbols = ["gearshape", "folder", nil, "circle.lefthalf.filled", "keyboard", "info.circle"]
         for (item, symbol) in zip(tabs.tabViewItems, symbols) {
-            item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: item.label)
+            item.image = symbol.map { NSImage(systemSymbolName: $0, accessibilityDescription: item.label) }
+                ?? MCPMark.image(accessibilityDescription: item.label)
         }
 
         // One window size for all five tabs, computed rather than chosen.
@@ -84,7 +87,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let sized = [general, storage, appearance, about] as [NSViewController]
         let height = sized.map(\.view.fittingSize.height).max() ?? PanelWindow.defaultHeight
         let size = NSSize(width: SettingsForm.contentWidth, height: height)
-        for controller in [general, storage, appearance, shortcuts, agent, about] as [NSViewController] {
+        for controller in [general, storage, agent, appearance, shortcuts, about] as [NSViewController] {
             controller.preferredContentSize = size
         }
 
@@ -139,7 +142,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         guard let window, baseHeight > 0 else { return }
         let target = max(baseHeight, needed.rounded(.up))
         let size = NSSize(width: SettingsForm.contentWidth, height: target)
-        for controller in [general, storage, appearance, shortcuts, agent, about] as [NSViewController] {
+        for controller in [general, storage, agent, appearance, shortcuts, about] as [NSViewController] {
             controller.preferredContentSize = size
         }
         let wanted = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
