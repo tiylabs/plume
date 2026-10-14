@@ -87,12 +87,16 @@ jobs:
           lipo "$BIN" -verify_arch "$ARCH"
           mkdir -p "build/$ARCH"
           cp "$BIN" "build/$ARCH/Plume"
+          swift build -c release --arch "$ARCH" --product plume-agent
+          HELPER="$(swift build -c release --arch "$ARCH" --product plume-agent --show-bin-path)/plume-agent"
+          lipo "$HELPER" -verify_arch "$ARCH"
+          cp "$HELPER" "build/$ARCH/plume-agent"
 
       - name: Upload the architecture binary
         uses: actions/upload-artifact@v4
         with:
           name: plume-${{ matrix.arch }}
-          path: build/${{ matrix.arch }}/Plume
+          path: build/${{ matrix.arch }}/
           if-no-files-found: error
           retention-days: 1
 
@@ -131,7 +135,9 @@ jobs:
           lipo build/Plume -verify_arch arm64
           lipo build/Plume -verify_arch x86_64
           # Artifact downloads do not preserve executable permissions.
-          chmod +x build/Plume
+          lipo -create build/arm64/plume-agent build/x86_64/plume-agent -output build/plume-agent
+          lipo build/plume-agent -verify_arch arm64 x86_64
+          chmod +x build/Plume build/plume-agent
 
       - name: Version from the tag
         id: version
@@ -243,6 +249,8 @@ jobs:
           # Universal, or the release silently drops every Intel Mac.
           lipo -archs /tmp/verify/Plume.app/Contents/MacOS/Plume | tee /dev/stderr | grep -q "x86_64"
           lipo -archs /tmp/verify/Plume.app/Contents/MacOS/Plume | grep -q "arm64"
+          lipo /tmp/verify/Plume.app/Contents/MacOS/plume-agent -verify_arch arm64 x86_64
+          codesign --verify --strict /tmp/verify/Plume.app/Contents/MacOS/plume-agent
           test "$(plutil -extract CFBundleShortVersionString raw /tmp/verify/Plume.app/Contents/Info.plist)" \
             = "${{ steps.version.outputs.version }}"
           # The alias is the whole reason this is an image rather than a zip.
