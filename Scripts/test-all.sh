@@ -37,7 +37,7 @@ if [[ "$only" != kit ]]; then
 	step "Keyboard tables"    Scripts/test-keyboard.sh
 	step "Theme contract"     bash -c 'cd Editor && node tests/theme-contract.mjs'
 	step "Editor bundle"      bash -c 'cd Editor && node build.mjs >/dev/null'
-	# Every WKWebView suite (commands, markdown, switcher, space-assignment, narrow, tooltip, i18n);
+	# Every WKWebView suite (commands, markdown, switcher, space-assignment, narrow, tooltip, i18n, agent);
 	# the list lives in Scripts/test-web.sh. The bundle was built once, two steps up.
 	step "WKWebView suites"   Scripts/test-web.sh --skip-editor
 fi

@@ -70,7 +70,7 @@ extension VaultService: AgentVaultAccessing {
             if lstat(url.path, &info) == 0, (info.st_mode & S_IFMT) != S_IFREG {
                 throw AgentFailure(.invalidNoteRef, "not a regular note file")
             }
-            return VaultIO.availability(of: url)
+            return self.agentAvailability(url)
         }
         switch availability {
         case .missing:
@@ -108,7 +108,7 @@ extension VaultService: AgentVaultAccessing {
                 let url = vault.appendingPathComponent(filename)
                 self.downloads.async {
                     do {
-                        try VaultIO.materialize(url, timeout: AgentLimits.downloadTimeout - 5)
+                        try self.agentMaterialize(url, AgentLimits.downloadTimeout - 5)
                         continuation.resume()
                     } catch VaultError.downloadTimedOut {
                         continuation.resume(throwing: AgentFailure(.downloadTimeout, "iCloud did not finish downloading the note in time"))
@@ -168,7 +168,7 @@ extension VaultService: AgentVaultAccessing {
             guard (try? NotePathPolicy.validate(url.lastPathComponent)) != nil else { return nil }
             var info = stat()
             guard lstat(url.path, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG else { return nil }
-            let availability = VaultIO.availability(of: url)
+            let availability = self.agentAvailability(url)
             let text: String?
             if availability == .available, let data = try? VaultIO.agentRead(url) {
                 text = String(data: data, encoding: .utf8)

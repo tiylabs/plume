@@ -47,6 +47,10 @@ public final class VaultService: @unchecked Sendable, VaultServicing {
     /// Held by agent API writes against Git's merge (see `VaultWriteGate`). A test supplies its own.
     public var writeGate = VaultWriteGate.shared
     public var writeGateTimeout = AgentLimits.worktreeGateTimeout
+    /// The agent API's view of iCloud, as seams: eviction cannot be staged in a temporary folder, so
+    /// without them the evicted paths of list, search and read would be reachable by no test.
+    public var agentAvailability: @Sendable (URL) -> NoteAvailability = { VaultIO.availability(of: $0) }
+    public var agentMaterialize: @Sendable (URL, TimeInterval) throws -> Void = { try VaultIO.materialize($0, timeout: $1) }
 
     public func setVault(_ url: URL) {
         queue.async { self.vaultURL = url }

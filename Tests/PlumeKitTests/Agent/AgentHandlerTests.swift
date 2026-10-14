@@ -381,6 +381,31 @@ func runAgentHandlerTests() {
             Check.equal(rig.call(.listNotes, [:]).failureCode, .authFailed, "the rig's caller was issued before the revoke")
         }
 
+        Check.mainTest("a revoke during a prepared write lets that write settle; the next request is refused") {
+            let rig = AgentRig()
+            let name = "2026-01-01-1200-rv.md"
+            rig.seed(name, "# RV\n")
+            let read = rig.read(name)!
+            let access = rig.access
+            rig.handler.stepHookForTesting = { step in
+                if step == "prepared" { try access.revoke() }
+            }
+            let id = uuid()
+            let result = rig.modify(name, version: read.version, [.append("- kept\n")], id: id)
+            Check.equal(result.value(WriteResult.self)?.state, .saved, "a prepared write is finished, not abandoned")
+            Check.equal(rig.disk(name), "# RV\n- kept\n")
+            Check.equal(rig.journal.all().first?.state, .saved, "and settled in the journal")
+            Check.equal(rig.failure(.listNotes, [:])?.code, .accessDisabled)
+        }
+
+        Check.mainTest("a request cancelled before it is prepared writes nothing") {
+            let rig = AgentRig()
+            let cancelled = NoteAccessHandler.Caller(generation: rig.access.access.generation, clientLabel: "test", isCancelled: { true })
+            let result = rig.call(.createNote, ["markdown": .string("# Never\n"), "request_id": .string(uuid())], caller: cancelled)
+            Check.equal(result.failureCode, .requestTimeout)
+            Check.equal(rig.noteFiles, [])
+        }
+
         Check.mainTest("unknown tools are refused") {
             let rig = AgentRig()
             let handler = rig.handler!

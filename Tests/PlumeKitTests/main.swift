@@ -43,5 +43,6 @@ runAgentSessionTests()
 runAgentIPCTests()
 runAgentMCPTests()
 runAgentGitGateTests()
+runAgentAvailabilityTests()
 
 exit(Check.finish())
