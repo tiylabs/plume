@@ -12,15 +12,23 @@ extension VaultService: AgentVaultAccessing {
         vault: URL, _ body: @escaping @Sendable () throws -> T
     ) async throws -> T {
         try await withCheckedThrowingContinuation { continuation in
-            queue.async {
-                guard Self.sameFolder(self.vaultURL, vault) else {
-                    continuation.resume(throwing: AgentFailure(
-                        .vaultChanged, "the notes folder changed while the request was waiting; list or search again"
-                    ))
-                    return
-                }
-                continuation.resume(with: Result { try body() })
+            onQueue(vault: vault, body) { continuation.resume(with: $0) }
+        }
+    }
+
+    /// The same, enqueued before it returns, with `completion` called on the vault queue.
+    private func onQueue<T: Sendable>(
+        vault: URL, _ body: @escaping @Sendable () throws -> T,
+        completion: @escaping @Sendable (Result<T, any Error>) -> Void
+    ) {
+        queue.async {
+            guard Self.sameFolder(self.vaultURL, vault) else {
+                completion(.failure(AgentFailure(
+                    .vaultChanged, "the notes folder changed while the request was waiting; list or search again"
+                )))
+                return
             }
+            completion(Result { try body() })
         }
     }
 
@@ -120,9 +128,16 @@ extension VaultService: AgentVaultAccessing {
         }
     }
 
-    public func agentReplace(filename: String, vault: URL, expectedHash: String, text: String) async throws -> String {
-        try NotePathPolicy.validate(filename)
-        return try await onQueue(vault: vault) {
+    public func agentReplace(
+        filename: String, vault: URL, expectedHash: String, text: String,
+        completion: @escaping @Sendable (Result<String, any Error>) -> Void
+    ) {
+        do {
+            try NotePathPolicy.validate(filename)
+        } catch {
+            return completion(.failure(error))
+        }
+        onQueue(vault: vault, {
             if self.writeDelayForTesting > 0 { Thread.sleep(forTimeInterval: self.writeDelayForTesting) }
             let hash = try VaultIO.agentReplace(
                 text: text, at: self.vaultURL.appendingPathComponent(filename),
@@ -130,7 +145,7 @@ extension VaultService: AgentVaultAccessing {
             )
             self.index.update(filename: filename, text: MarkdownDocument.normalizeTrailingNewline(text), modified: Date())
             return hash
-        }
+        }, completion: completion)
     }
 
     public func agentReserveName(text: String, vault: URL, excluding: Set<String>) async throws -> String {

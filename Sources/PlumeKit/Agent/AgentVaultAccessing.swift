@@ -56,7 +56,12 @@ public protocol AgentVaultAccessing: AnyObject, Sendable {
     /// saved on disk, because the API never exposes unsaved text.
     func agentSearch(query: String, vault: URL, diskOnly: Set<String>) async throws -> AgentSearchOutcome
     func agentRead(filename: String, vault: URL, download: Bool) async throws -> AgentDiskNote
-    func agentReplace(filename: String, vault: URL, expectedHash: String, text: String) async throws -> String
+    /// Enqueued before it returns, and `completion` runs on the vault queue — not `async`, because
+    /// the open note's write gate needs both: see `NoteAccessHandler.replaceOnVaultQueue`.
+    func agentReplace(
+        filename: String, vault: URL, expectedHash: String, text: String,
+        completion: @escaping @Sendable (Result<String, any Error>) -> Void
+    )
     /// A unique name for a new note with this text, not colliding with `excluding` either.
     func agentReserveName(text: String, vault: URL, excluding: Set<String>) async throws -> String
     func agentCreate(filename: String, vault: URL, text: String) async throws -> String

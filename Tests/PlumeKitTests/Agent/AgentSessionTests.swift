@@ -43,6 +43,29 @@ func runAgentSessionTests() {
             output.clear()
         }
 
+        /// Turns the run loop until the write in flight is prepared, then a little longer: the gate is
+        /// taken in the main-actor turn that follows, and the replace is on the vault queue after it.
+        func settleUntilPrepared() {
+            let journal = agent.journal
+            runAsync {
+                while journal.all().first?.state != .prepared { try? await Task.sleep(nanoseconds: 5_000_000) }
+                try? await Task.sleep(nanoseconds: 50_000_000)
+            }
+        }
+
+        /// Starts a modify and returns without waiting for it; `outcome` is filled in when it ends.
+        func startModify(_ name: String, version: String, _ change: NoteChange) -> () -> Result<JSONValue, AgentFailure>? {
+            let handler = agent.handler!
+            let caller = agent.caller!
+            let params: JSONValue = .object([
+                "note_ref": .string(agent.refOf(name)), "expected_version": .string(version),
+                "changes": try! JSONValue.from([change]), "request_id": .string(uuid()),
+            ])
+            var outcome: Result<JSONValue, AgentFailure>?
+            Task { @MainActor in outcome = await handler.handle(method: "modify_note", params: params, caller: caller) }
+            return { outcome }
+        }
+
         func typeAndSave(_ text: String) {
             session.edited(text: text, caret: text.utf16.count)
             clock.advance(by: WritePolicy.debounce + 0.01)
@@ -152,7 +175,7 @@ func runAgentSessionTests() {
                     "changes": try! JSONValue.from([NoteChange.append("agent line\n")]), "request_id": .string(uuid()),
                 ]), caller: caller)
             }
-            rig.settle(0.1)
+            rig.settleUntilPrepared()
             rig.session.edited(text: "# Race\nuser typing\n", caret: 10)   // the person clicks in and types
             rig.settle(0.5)
             rig.agent.vault.writeDelayForTesting = 0
@@ -185,7 +208,7 @@ func runAgentSessionTests() {
                     "changes": try! JSONValue.from([NoteChange.append("x\n")]), "request_id": .string(uuid()),
                 ]), caller: caller)
             }
-            rig.settle(0.05)
+            rig.settleUntilPrepared()
             rig.session.open("2026-01-01-1201-b.md")
             rig.settle(0.6)
             rig.agent.vault.writeDelayForTesting = 0
@@ -198,6 +221,77 @@ func runAgentSessionTests() {
             let firstB = rig.output.loads.firstIndex { $0.filename == "2026-01-01-1201-b.md" } ?? -1
             Check.expect(lastA < firstB, "A was reloaded over B")
             Check.equal(rig.agent.disk("2026-01-01-1200-a.md"), "# A\nx\n")
+        }
+
+        // The gate defers a save rather than refusing it, so it must not be held while anything but
+        // the replace itself is pending. It used to be taken before the journal writes, which go to a
+        // queue of their own: the person typed into A and switched to B meanwhile, the switch's save
+        // of A waited behind the gate as a flag, B's load did not, and B replaced the buffer holding
+        // the words. The flag then saved B, unchanged. The write reported success with no warning, and
+        // the words were in no note and no conflict copy.
+        Check.mainTest("typing, then switching notes, while the write is being recorded: the typing is saved, the write conflicts") {
+            let rig = Rig()
+            let a = "2026-01-01-1200-a.md"
+            rig.open(a, "# A\n")
+            rig.agent.seed("2026-01-01-1201-b.md", "# B\n")
+            let read = rig.agent.read(a)!
+            // 0.3 s per journal write: accepted at 0.3, the two snapshots by 0.9, prepared at 1.2.
+            rig.agent.handler.journalDelayForTesting = 0.3
+            let outcome = rig.startModify(a, version: read.version, .append("agent line\n"))
+            rig.settle(0.6)
+            rig.session.edited(text: "# A\nuser typing\n", caret: 10)
+            rig.session.open("2026-01-01-1201-b.md")
+            rig.settle(1.8)
+            rig.agent.handler.journalDelayForTesting = 0
+            Check.equal(rig.session.currentFilename, "2026-01-01-1201-b.md")
+            Check.equal(rig.agent.disk(a), "# A\nuser typing\n", "the switch saved the typing")
+            Check.equal(outcome()?.failureCode, .versionConflict, "the write, prepared against the old text, is refused")
+            Check.equal(rig.agent.noteFiles.filter { $0.contains("-conflict-") }, [])
+        }
+
+        // ⌘N empties the buffer at once, with no load to queue behind the write — so even a gate held
+        // only for the replace itself (as long as Git sync's merge, up to five seconds) can be
+        // overtaken. The save the gate deferred is kept with its own note and written when the gate
+        // opens.
+        Check.mainTest("typing, then ⌘N, while the write is on its way to disk: the typing goes to a conflict copy") {
+            let rig = Rig()
+            let a = "2026-01-01-1200-a.md"
+            rig.open(a, "# A\n")
+            let read = rig.agent.read(a)!
+            rig.agent.vault.writeDelayForTesting = 0.3
+            let outcome = rig.startModify(a, version: read.version, .append("agent line\n"))
+            rig.settleUntilPrepared()
+            rig.session.edited(text: "# A\nuser typing\n", caret: 10)
+            rig.session.create(title: "")
+            rig.settle(1.0)
+            rig.agent.vault.writeDelayForTesting = 0
+            let write = outcome()?.value(WriteResult.self)
+            Check.equal(write?.state, .saved)
+            Check.expect(write?.warnings.contains { $0.code == "user_edited_during_write" } == true, "\(write?.warnings ?? [])")
+            Check.equal(rig.agent.disk(a), "# A\nagent line\n")
+            let sibling = rig.agent.noteFiles.first { $0.contains("-conflict-") }
+            Check.expect(sibling != nil, "the typing went to a conflict copy: \(rig.agent.noteFiles)")
+            if let sibling { Check.equal(rig.agent.disk(sibling), "# A\nuser typing\n") }
+            Check.equal(rig.session.agentCurrentFilename, nil, "the panel is on the new draft")
+        }
+
+        Check.mainTest("typing, then ⌘N, while a write that fails is in flight: the typing is saved in place") {
+            let rig = Rig()
+            let a = "2026-01-01-1200-a.md"
+            rig.open(a, "# A\n")
+            let read = rig.agent.read(a)!
+            rig.agent.vault.writeDelayForTesting = 0.3
+            let outcome = rig.startModify(a, version: read.version, .append("agent line\n"))
+            rig.settleUntilPrepared()
+            // Changed behind everyone's back: the replace will find a different hash and refuse.
+            rig.agent.seed(a, "# A\nfrom elsewhere\n")
+            rig.session.edited(text: "# A\nuser typing\n", caret: 10)
+            rig.session.create(title: "")
+            rig.settle(1.0)
+            rig.agent.vault.writeDelayForTesting = 0
+            Check.equal(outcome()?.failureCode, .versionConflict)
+            let withTyping = rig.agent.noteFiles.filter { rig.agent.disk($0) == "# A\nuser typing\n" }
+            Check.equal(withTyping.count, 1, "the typing is on disk exactly once: \(rig.agent.noteFiles)")
         }
 
         Check.mainTest("a note whose name still follows its title is settled before its ref is handed out") {

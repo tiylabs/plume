@@ -20,8 +20,15 @@ public protocol AgentSessionGating: AnyObject {
     /// invalidating the ref.
     func agentSettleNames(_ filenames: Set<String>)
 
+    /// Why a write to `filename` would be refused right now, without claiming anything. Nil when it
+    /// would be allowed, or when `filename` is not the open note.
+    func agentWriteRefusal(_ filename: String, panelHasKeyboard: Bool) -> AgentFailure?
+
     /// For the open note: claims the session's write gate, or says why not. Nil when `filename` is
     /// not the open note — then there is nothing in the session to coordinate with.
+    ///
+    /// The caller must have the write on the vault queue before its turn on the main actor ends;
+    /// the gate defers the panel's own saves, and only that order makes deferring them safe.
     ///
     /// `panelHasKeyboard` comes from the panel (AppKit); the session cannot see it.
     func agentBeginWrite(_ filename: String, panelHasKeyboard: Bool) -> Result<AgentWriteTicket, AgentFailure>?

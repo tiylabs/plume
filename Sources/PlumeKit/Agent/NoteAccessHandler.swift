@@ -41,6 +41,10 @@ public final class NoteAccessHandler {
     /// Crash-injection hook for the suite: called with each step name; throwing abandons the
     /// operation at that point, exactly where a killed process would stop.
     public var stepHookForTesting: ((String) throws -> Void)?
+    /// Held inside every journal write, on the journal's queue. Zero in the app. A test sets it so a
+    /// write is still being recorded while the person types and switches notes — the window the
+    /// session's gate must not span (`commitReplace`).
+    public var journalDelayForTesting: TimeInterval = 0
 
     public private(set) var vaultURL: URL
     /// Bumped on every vault change; versions carry it, so none survives a switch.
@@ -370,16 +374,22 @@ public final class NoteAccessHandler {
     /// Runs a journal write on the journal queue and waits for it to be durable.
     func persist(_ record: OperationRecord) async throws {
         let journal = journal
+        let delay = journalDelayForTesting
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-            journalQueue.async { continuation.resume(with: Result { try journal.save(record) }) }
+            journalQueue.async {
+                if delay > 0 { Thread.sleep(forTimeInterval: delay) }
+                continuation.resume(with: Result { try journal.save(record) })
+            }
         }
         onOperationRecorded?(record)
     }
 
     func persistSnapshot(_ text: String, of operationID: String, _ which: OperationJournal.Snapshot) async throws {
         let journal = journal
+        let delay = journalDelayForTesting
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             journalQueue.async {
+                if delay > 0 { Thread.sleep(forTimeInterval: delay) }
                 continuation.resume(with: Result { try journal.saveSnapshot(text, of: operationID, which) })
             }
         }

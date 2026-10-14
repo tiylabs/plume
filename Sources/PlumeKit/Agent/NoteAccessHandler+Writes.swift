@@ -160,11 +160,10 @@ extension NoteAccessHandler {
     ) async throws -> WriteResult {
         guard let filename = record.filename else { throw AgentFailure(.saveFailed, "no target") }
 
-        var ticket: AgentWriteTicket?
-        switch session?.agentBeginWrite(filename, panelHasKeyboard: panelHasKeyboard()) {
-        case .failure(let busy)?: try await reject(&record, busy)
-        case .success(let claimed)?: ticket = claimed
-        case nil: break
+        // An early NOTE_BUSY, so a note being edited costs no snapshots. Only an answer, not the
+        // gate: that is taken below, once nothing but the replace itself is left to wait for.
+        if let busy = session?.agentWriteRefusal(filename, panelHasKeyboard: panelHasKeyboard()) {
+            try await reject(&record, busy)
         }
 
         record.afterHash = ContentHash.of(after)
@@ -178,18 +177,29 @@ extension NoteAccessHandler {
             record.state = .prepared
             try await persist(record)
         } catch {
-            if let ticket { session?.agentAbortWrite(ticket) }
             throw AgentFailure(.saveFailed, "could not record the change before making it: \(error)")
                 .forRequest(record.requestID, state: .accepted)
         }
-        do { try step("prepared") } catch {
-            if let ticket { session?.agentAbortWrite(ticket) }
-            throw error
+        try step("prepared")
+
+        // The gate, and the replace on the vault queue, in this one main-actor turn. The gate defers
+        // the panel's saves of this note as a flag; that is only safe while this write is queued
+        // ahead of anything the panel asks for next, so a note switch's load runs after it and the
+        // deferred save runs while this note is still the open one — the order a rename's gate has
+        // (`NoteSession.holdingTheWriteGate`). Taken before the journal writes above, as it once
+        // was, the person could type and switch notes while those were on their own queue: the
+        // switch's load overtook them and replaced the buffer while its save waited as a flag, and
+        // the words were lost with nothing reported.
+        var ticket: AgentWriteTicket?
+        switch session?.agentBeginWrite(filename, panelHasKeyboard: panelHasKeyboard()) {
+        case .failure(let busy)?: try await reject(&record, busy)
+        case .success(let claimed)?: ticket = claimed
+        case nil: break
         }
 
         let hash: String
         do {
-            hash = try await vault.agentReplace(filename: filename, vault: URL(fileURLWithPath: record.vaultPath), expectedHash: expectedHash, text: after)
+            hash = try await replaceOnVaultQueue(filename: filename, vault: URL(fileURLWithPath: record.vaultPath), expectedHash: expectedHash, text: after)
         } catch {
             if let ticket { session?.agentAbortWrite(ticket) }
             try await reject(&record, error)
@@ -200,6 +210,21 @@ extension NoteAccessHandler {
         }
         try step("written")
         return try await finishSaved(&record, hash: hash, text: after, changed: true, warnings: warnings)
+    }
+
+    /// `agentReplace`, awaited without a hop between the caller's turn and the vault queue.
+    ///
+    /// The continuation's body runs synchronously on the main actor, so the replace is enqueued in
+    /// the turn that took the gate — an `async` vault method would start on the generic executor
+    /// first, and a note switch in that hop would put its load ahead of the write. And it resumes
+    /// from the vault queue itself, so this task is scheduled on the main actor before anything the
+    /// queue runs next can post its own answer there.
+    func replaceOnVaultQueue(filename: String, vault: URL, expectedHash: String, text: String) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            self.vault.agentReplace(filename: filename, vault: vault, expectedHash: expectedHash, text: text) {
+                continuation.resume(with: $0)
+            }
+        }
     }
 
     // MARK: - Restore (Settings)
@@ -467,7 +492,7 @@ extension NoteAccessHandler {
                 return record  // the person is editing it; leave it prepared for a later pass
             case .success(let ticket)?:
                 do {
-                    let hash = try await vault.agentReplace(filename: filename, vault: boundVault, expectedHash: expected, text: after)
+                    let hash = try await replaceOnVaultQueue(filename: filename, vault: boundVault, expectedHash: expected, text: after)
                     _ = session?.agentFinishWrite(ticket, savedText: after, savedHash: hash)
                     return await markRecoveredSaved(record, hash: hash)
                 } catch {
@@ -475,7 +500,7 @@ extension NoteAccessHandler {
                     return await markUnknown(record)
                 }
             case nil:
-                guard let hash = try? await vault.agentReplace(filename: filename, vault: boundVault, expectedHash: expected, text: after) else {
+                guard let hash = try? await replaceOnVaultQueue(filename: filename, vault: boundVault, expectedHash: expected, text: after) else {
                     return await markUnknown(record)
                 }
                 return await markRecoveredSaved(record, hash: hash)
