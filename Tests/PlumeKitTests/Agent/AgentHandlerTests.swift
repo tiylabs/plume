@@ -347,14 +347,26 @@ func runAgentHandlerTests() {
                 }
             }.start()
             held.wait()
-            let busy = rig.modify(name, version: read.version, [.replace("# G", with: "# H")])
+            let id = uuid()
+            let busy = rig.modify(name, version: read.version, [.replace("# G", with: "# H")], id: id)
             released.signal()
             if case .failure(let failure) = busy {
                 Check.equal(failure.code, .noteBusy)
                 Check.equal(failure.details?["reason"], "syncing")
                 Check.equal(failure.operationState, .rejected)
+                Check.expect(!failure.retryable, "the same request can never succeed now")
             } else {
                 Check.expect(false, "expected NOTE_BUSY")
+            }
+            Check.equal(rig.disk(name), "# G\n")
+
+            // The gate is free now, and still the same ID only replays the recorded refusal — which
+            // is why it must not have said `retryable`. A new ID is what goes through.
+            if case .failure(let replayed) = rig.modify(name, version: read.version, [.replace("# G", with: "# H")], id: id) {
+                Check.equal(replayed.code, .noteBusy)
+                Check.expect(!replayed.retryable)
+            } else {
+                Check.expect(false, "a rejected request ID is not run again")
             }
             Check.equal(rig.disk(name), "# G\n")
             Check.equal(rig.modify(name, version: read.version, [.replace("# G", with: "# H")]).value(WriteResult.self)?.changed, true)

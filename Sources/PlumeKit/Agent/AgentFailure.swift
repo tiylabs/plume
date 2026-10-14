@@ -48,7 +48,8 @@ public enum AgentErrorCode: String, Codable, Sendable, CaseIterable {
 
     /// Whether repeating the same request, unchanged, can succeed later. A version conflict is not
     /// retryable in this sense: the agent has to read again and rethink the change, with a new
-    /// request ID.
+    /// request ID. Nor is any write the journal has recorded as rejected, whatever its code — its
+    /// request ID now replays that refusal (`NoteAccessHandler.terminal`).
     public var retryable: Bool {
         switch self {
         case .appNotReady, .requestTimeout, .noteBusy, .rateLimited, .downloadTimeout, .saveFailed:

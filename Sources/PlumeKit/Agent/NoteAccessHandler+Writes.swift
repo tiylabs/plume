@@ -358,7 +358,7 @@ extension NoteAccessHandler {
                 version: nil, versionExpiresAt: nil, changed: record.changed ?? false, warnings: warnings
             )
         case .rejected:
-            throw (record.error ?? AgentFailure(.saveFailed, "the write was not made")).forRequest(record.requestID, state: .rejected)
+            throw Self.terminal(record.error ?? AgentFailure(.saveFailed, "the write was not made")).forRequest(record.requestID, state: .rejected)
         case .outcomeUnknown:
             throw unknownOutcome(record)
         case .accepted, .prepared:
@@ -386,11 +386,24 @@ extension NoteAccessHandler {
 
     /// Marks the operation rejected — the note is unchanged — and throws the reason.
     func reject(_ record: inout OperationRecord, _ error: any Error) async throws -> Never {
-        let failure = (error as? AgentFailure) ?? AgentFailure(.saveFailed, String(describing: error))
+        let failure = Self.terminal((error as? AgentFailure) ?? AgentFailure(.saveFailed, String(describing: error)))
         record.state = .rejected
         record.error = failure
         try? await persist(record)
         throw failure.forRequest(record.requestID, state: .rejected)
+    }
+
+    /// A failure for a request the journal holds as rejected. Never `retryable`, whatever its code
+    /// says on its own: the journal replays the refusal for that request ID as long as it keeps the
+    /// record, so the same request cannot succeed later — only a new request ID can (after reading
+    /// again, if the note may have changed). A rejected NOTE_BUSY used to say `retryable: true`, and
+    /// a caller that believed it retried the same ID into the same recorded refusal.
+    static func terminal(_ failure: AgentFailure) -> AgentFailure {
+        guard failure.retryable else { return failure }
+        var terminal = failure
+        terminal.retryable = false
+        terminal.message += " (this request_id is used up: retry with a new one)"
+        return terminal
     }
 
     func finishSaved(
@@ -452,7 +465,7 @@ extension NoteAccessHandler {
         switch record.state {
         case .accepted:
             record.state = .rejected
-            record.error = AgentFailure(.saveFailed, "Plume stopped before this write was prepared; nothing was changed")
+            record.error = Self.terminal(AgentFailure(.saveFailed, "Plume stopped before this write was prepared; nothing was changed"))
             try? await persist(record)
             return record
         case .prepared:

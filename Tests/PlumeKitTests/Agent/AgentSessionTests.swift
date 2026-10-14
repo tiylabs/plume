@@ -84,7 +84,8 @@ func runAgentSessionTests() {
             if case .failure(let failure) = result {
                 Check.equal(failure.code, .noteBusy)
                 Check.equal(failure.details?["reason"], "editing")
-                Check.expect(failure.retryable)
+                Check.expect(!failure.retryable, "recorded as rejected: this request ID can only replay the refusal")
+                Check.expect(failure.message.contains("retry with a new one"), failure.message)
             } else { Check.expect(false, "expected NOTE_BUSY") }
             Check.equal(rig.agent.disk("2026-01-01-1200-open.md"), "# Open\n\nbody\n")
             Check.equal(rig.output.loads.count, 0)
