@@ -39,14 +39,17 @@ func runAgentIPCTests() {
         }
     }
 
-    func fixture(instance: String? = nil, start: Bool = true, permission: AgentPermission = .readWrite) -> Fixture {
+    func fixture(
+        instance: String? = nil, start: Bool = true, permission: AgentPermission = .readWrite,
+        sendTimeout: TimeInterval = AgentLimits.ipcSendTimeout
+    ) -> Fixture {
         let short = String(UUID().uuidString.prefix(8))
         let runtime = AgentRuntimeDirectory(directory: AgentRuntimeDirectory.userTemporaryDirectory().appendingPathComponent("pat-\(short)"))
         let bundle = URL(fileURLWithPath: "/Applications/Plume Dev \(short).app")
         let location = AgentInstallLocation(appBundle: bundle, profile: .dev, appVersion: "1.0")
         let server = AgentSocketServer(runtime: runtime, identity: .init(
             profile: .dev, instance: instance ?? location.instance, appVersion: "1.0", bundlePath: bundle.path
-        ))
+        ), sendTimeout: sendTimeout)
         server.authenticate = { token in
             guard permission != .off else { return .failure(AgentFailure(.accessDisabled, "off")) }
             guard AgentAccessStore.matches(token, "secret") else { return .failure(AgentFailure(.authFailed, "bad")) }
@@ -69,6 +72,30 @@ func runAgentIPCTests() {
 
     func code(_ body: () throws -> Void) -> AgentErrorCode? {
         do { try body(); return nil } catch let f as AgentFailure { return f.code } catch { return nil }
+    }
+
+    /// A connected pair of stream sockets, as the app and a helper would hold them.
+    func socketPair() -> (Int32, Int32) {
+        var fds: [Int32] = [0, 0]
+        precondition(socketpair(AF_UNIX, SOCK_STREAM, 0, &fds) == 0)
+        return (fds[0], fds[1])
+    }
+
+    /// Reads and discards until the peer closes: the byte count then, or nil if it is still open at
+    /// the deadline. Reading is what lets a sender that would wait for ever finish its frame, so
+    /// "still open" here means the sender never gave up.
+    func drainUntilClosed(_ fd: Int32, within seconds: TimeInterval) -> Int? {
+        var total = 0
+        var buffer = [UInt8](repeating: 0, count: 1 << 16)
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            var poller = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+            guard poll(&poller, 1, 50) > 0 else { continue }
+            let received = recv(fd, &buffer, buffer.count, 0)
+            if received <= 0 { return total }
+            total += received
+        }
+        return nil
     }
 
     Check.mainSuite("Agent IPC · socket and handshake") {
@@ -240,6 +267,78 @@ func runAgentIPCTests() {
                 } catch { return error as? AgentFailure }
             }
             Check.equal(lost?.code, .requestTimeout)
+        }
+
+        Check.mainTest("a revoke's permission change reaches the helper before its connection closes") {
+            let f = fixture()
+            defer { f.server.stop() }
+            let client = f.client()
+            final class Seen: @unchecked Sendable { var permission: AgentPermission? }
+            let seen = Seen()
+            client.onPermissionChanged = { seen.permission = $0 }
+            Check.equal(offMain { try? client.connect() }, .readWrite)
+            f.server.broadcast(.permissionChanged(.off))
+            f.server.disconnectAll()
+            _ = offMain { Thread.sleep(forTimeInterval: 0.3); return true }
+            Check.equal(seen.permission, .off)
+            Check.equal(client.permission, nil, "and then the connection is gone")
+        }
+
+        Check.mainTest("a frame the peer does not take within the send deadline fails, and does not wait longer") {
+            let (mine, theirs) = socketPair()
+            defer { close(theirs) }
+            let socket = IPCSocket(fd: mine, sendTimeout: 0.3)
+            let started = Date()
+            let failure = code { try socket.writeFrame(Data(count: 2 << 20)) }
+            let took = Date().timeIntervalSince(started)
+            Check.equal(failure, .requestTimeout)
+            Check.expect(took >= 0.25 && took < 2, "gave up at the deadline, not before or long after: \(took) s")
+            socket.close()
+            Check.equal(code { try socket.writeFrame(Data("{}".utf8)) }, .requestTimeout, "nothing is sent once closed")
+        }
+
+        Check.mainTest("an outbox returns at once, and a peer too far behind is disconnected") {
+            let (mine, theirs) = socketPair()
+            defer { close(theirs) }
+            // A long send deadline, so only the bound on what may wait can end this quickly.
+            let socket = IPCSocket(fd: mine, sendTimeout: 30)
+            let outbox = IPCOutbox(socket: socket, maxQueuedBytes: 1 << 20)
+            let blob = JSONValue.string(String(repeating: "x", count: 600 << 10))
+            let started = Date()
+            for _ in 0..<3 { outbox.send(blob) }
+            Check.expect(Date().timeIntervalSince(started) < 0.5, "send only queues")
+            let received = drainUntilClosed(theirs, within: 3)
+            Check.expect(received != nil, "the connection was dropped instead of buffering for a peer that does not read")
+            Check.expect((received ?? 0) < 3 * (600 << 10), "not everything was sent: \(received ?? -1) bytes")
+            socket.close()
+        }
+
+        Check.mainTest("a client that stops reading never holds the reply, and is disconnected at the send deadline") {
+            let f = fixture(start: false, sendTimeout: 0.3)
+            final class Timing: @unchecked Sendable { var replyTook: TimeInterval? }
+            let timing = Timing()
+            let blob = String(repeating: "x", count: 2 << 20)
+            f.server.onRequest = { _, _, _, _, reply in
+                let started = Date()
+                reply(.success(.object(["blob": .string(blob)])))
+                timing.replyTook = Date().timeIntervalSince(started)
+            }
+            try! f.server.start()
+            f.server.readiness = .ready
+            defer { f.server.stop() }
+
+            guard case .success(let raw) = IPCSocket.connect(to: f.runtime.socketURL) else { return Check.expect(false, "connect") }
+            try! raw.write(IPCMessage.hello(profile: "dev", instance: f.location.instance, appVersion: "1", token: "secret", clientLabel: nil))
+            let welcome = try? raw.readFrame(timeout: 2).flatMap { try IPCMessage.decode($0) }
+            Check.equal(welcome?.type, .welcome)
+            try! raw.write(IPCMessage.request(id: "r1", method: .readNote, params: .object([:])))
+            // Nobody reads for well past the deadline.
+            _ = offMain { Thread.sleep(forTimeInterval: 1); return true }
+
+            Check.expect((timing.replyTook ?? 99) < 0.5, "the reply only queued its frame: \(timing.replyTook ?? -1) s")
+            let received = drainUntilClosed(raw.fd, within: 3)
+            Check.expect(received != nil, "the stalled connection was closed")
+            Check.expect((received ?? .max) < blob.utf8.count, "the frame was abandoned, not finished: \(received ?? -1) bytes")
         }
 
         Check.mainTest("a write that times out says it may have been saved and names its request") {

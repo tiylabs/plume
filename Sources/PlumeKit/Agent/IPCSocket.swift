@@ -13,26 +13,45 @@ import Foundation
 /// with `poll` deadlines are the shape that is easiest to get right.
 public final class IPCSocket: @unchecked Sendable {
     public let fd: Int32
+    /// How long one frame may take to leave, or nil to wait as long as the peer takes. The app sets
+    /// it on every connection it accepts (`IPCOutbox` says why); the helper's end waits.
+    public let sendTimeout: TimeInterval?
     private let writeLock = NSLock()
     private var closed = false
     private let stateLock = NSLock()
 
-    public init(fd: Int32) {
+    public init(fd: Int32, sendTimeout: TimeInterval? = nil) {
         self.fd = fd
+        self.sendTimeout = sendTimeout
         var on: Int32 = 1
         // A peer that vanished must not kill this process with SIGPIPE.
         setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
+        if let sendTimeout {
+            // One `send` blocks at most this slice, so `writeFrame` can check its deadline between
+            // calls. A send-only timeout: the connection thread's reads still block as before.
+            // (`MSG_DONTWAIT` after a `POLLOUT` is not enough: measured on macOS 27, a send of a
+            // 2 MiB frame on a Unix stream socket with that flag still blocked until the peer read.)
+            let slice = min(sendTimeout, 0.25)
+            var limit = timeval(tv_sec: Int(slice), tv_usec: Int32((slice - slice.rounded(.down)) * 1_000_000))
+            setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &limit, socklen_t(MemoryLayout<timeval>.size))
+        }
     }
 
     deinit { close() }
 
+    /// Shut down first, so a send blocked on this socket in another thread fails at once and lets go
+    /// of the write lock; then release the descriptor under that lock. A send can then never reach
+    /// the number after it has been reused for another file — which, with replies sent from a queue
+    /// of their own (`IPCOutbox`), a send still queued when the connection ends would otherwise do.
     public func close() {
-        stateLock.lock()
-        defer { stateLock.unlock() }
-        guard !closed else { return }
-        closed = true
+        let first = stateLock.withLock { () -> Bool in
+            guard !closed else { return false }
+            closed = true
+            return true
+        }
+        guard first else { return }
         Darwin.shutdown(fd, SHUT_RDWR)
-        Darwin.close(fd)
+        writeLock.withLock { _ = Darwin.close(fd) }
     }
 
     /// Unblocks a reader in another thread without releasing the descriptor yet.
@@ -49,14 +68,20 @@ public final class IPCSocket: @unchecked Sendable {
         var length = UInt32(data.count).bigEndian
         var frame = Data(bytes: &length, count: 4)
         frame.append(data)
+        let deadline = sendTimeout.map { Date().addingTimeInterval($0) }
         writeLock.lock()
         defer { writeLock.unlock() }
+        guard !stateLock.withLock({ closed }) else { throw IPCSocket.connectionLost() }
         try frame.withUnsafeBytes { buffer in
             var offset = 0
             while offset < buffer.count {
+                // A frame that misses its deadline may be half sent; the caller must drop the
+                // connection, because the stream cannot be resumed mid-frame.
+                if let deadline, deadline.timeIntervalSinceNow <= 0 { throw IPCSocket.sendTimedOut() }
                 let sent = Darwin.send(fd, buffer.baseAddress! + offset, buffer.count - offset, 0)
                 if sent < 0 {
-                    if errno == EINTR { continue }
+                    // EAGAIN: a `SO_SNDTIMEO` slice ran out with nothing taken.
+                    if errno == EINTR || errno == EAGAIN { continue }
                     throw IPCSocket.connectionLost()
                 }
                 offset += sent
@@ -113,6 +138,10 @@ public final class IPCSocket: @unchecked Sendable {
 
     public static func connectionLost() -> AgentFailure {
         AgentFailure(.requestTimeout, "the connection to Plume closed before an answer arrived", retryable: true)
+    }
+
+    static func sendTimedOut() -> AgentFailure {
+        AgentFailure(.requestTimeout, "the other end stopped reading; the connection is closed", retryable: true)
     }
 
     // MARK: - Connecting and listening

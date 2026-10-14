@@ -41,6 +41,13 @@ public enum AgentLimits {
     public static let maxChangesPerRequest = 32
     /// One IPC frame. Bigger than a note so a 1 MiB note plus its JSON escaping still fits.
     public static let ipcMaxFrameBytes = 4 << 20
+    /// How long the app waits for a helper to take one frame before it drops the connection. A
+    /// helper that reads takes a full frame in milliseconds; one that has stopped (⌃Z on the agent
+    /// stops the helper with it) reconnects when it resumes.
+    public static let ipcSendTimeout: TimeInterval = 5
+    /// What may wait unsent on one connection: four full frames. A helper further behind than that
+    /// is not reading, and is dropped rather than buffered for.
+    public static let ipcMaxQueuedBytes = 4 * ipcMaxFrameBytes
     public static let maxExamples = 3
     /// Example bodies in one writing context, together.
     public static let examplesMaxBytes = 32 << 10

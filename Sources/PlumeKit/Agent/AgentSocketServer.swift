@@ -13,7 +13,8 @@ import Foundation
 ///   milliseconds rather than time out.
 ///
 /// What it does not decide: anything about notes. A request is passed to `onRequest` with a reply
-/// closure, and the coordinator answers it from the main actor.
+/// closure, and the coordinator answers it from the main actor. The reply, like a broadcast, only
+/// queues the frame on the connection's `IPCOutbox`, so no peer can hold the main thread.
 public final class AgentSocketServer: @unchecked Sendable {
 
     public struct Identity: Sendable {
@@ -72,12 +73,21 @@ public final class AgentSocketServer: @unchecked Sendable {
     private var _readiness: Readiness = .starting
     private var ownerLock: AgentOwnerLock?
     private var listenFD: Int32 = -1
-    private var connections: [UUID: IPCSocket] = [:]
+    private var connections: [UUID: Connection] = [:]
     private var running = false
+    private let sendTimeout: TimeInterval
 
-    public init(runtime: AgentRuntimeDirectory, identity: Identity) {
+    private struct Connection {
+        let socket: IPCSocket
+        let outbox: IPCOutbox
+    }
+
+    public init(
+        runtime: AgentRuntimeDirectory, identity: Identity, sendTimeout: TimeInterval = AgentLimits.ipcSendTimeout
+    ) {
         self.runtime = runtime
         self.identity = identity
+        self.sendTimeout = sendTimeout
     }
 
     public var readiness: Readiness {
@@ -142,7 +152,7 @@ public final class AgentSocketServer: @unchecked Sendable {
             running = false
             let fd = listenFD
             listenFD = -1
-            let open = Array(connections.values)
+            let open = connections.values.map(\.socket)
             connections.removeAll()
             return (fd, open)
         }
@@ -155,20 +165,22 @@ public final class AgentSocketServer: @unchecked Sendable {
         lock.withLock { ownerLock = nil }
     }
 
-    /// Sends a frame to every authenticated connection — permission changes.
+    /// Queues a frame to every authenticated connection — permission changes.
     public func broadcast(_ message: IPCMessage) {
         let open = lock.withLock { Array(connections.values) }
-        for socket in open { try? socket.write(message) }
+        for connection in open { connection.outbox.send(message) }
     }
 
     /// Closes every connection; a revoke uses this so nothing keeps working on the old credential.
+    /// Each closes behind the frames already queued for it, so a broadcast just before still lands.
+    /// Requests are re-checked against the credential on arrival, so the wait opens nothing up.
     public func disconnectAll() {
-        let open = lock.withLock { () -> [IPCSocket] in
+        let open = lock.withLock { () -> [Connection] in
             let open = Array(connections.values)
             connections.removeAll()
             return open
         }
-        for socket in open { socket.shutdown() }
+        for connection in open { connection.outbox.shutdownAfterQueued() }
     }
 
     // MARK: - Connections
@@ -180,7 +192,7 @@ public final class AgentSocketServer: @unchecked Sendable {
                 if errno == EINTR { continue }
                 return
             }
-            let socket = IPCSocket(fd: client)
+            let socket = IPCSocket(fd: client, sendTimeout: sendTimeout)
             guard socket.peerUID() == getuid() else {
                 socket.close()
                 continue
@@ -193,7 +205,7 @@ public final class AgentSocketServer: @unchecked Sendable {
 
     private func serve(_ socket: IPCSocket) {
         defer { socket.close() }
-        guard let client = handshake(socket) else { return }
+        guard let (client, outbox) = handshake(socket) else { return }
         defer { _ = lock.withLock { connections.removeValue(forKey: client.connectionID) } }
 
         while true {
@@ -222,7 +234,7 @@ public final class AgentSocketServer: @unchecked Sendable {
                     return
                 }
                 onRequest(client, id, method, message.params ?? .object([:])) { result in
-                    try? socket.write(IPCMessage.response(id: id, result: result))
+                    outbox.send(IPCMessage.response(id: id, result: result))
                 }
             case .cancel:
                 if let id = message.id { onCancel(client, id) }
@@ -233,8 +245,8 @@ public final class AgentSocketServer: @unchecked Sendable {
         }
     }
 
-    private func handshake(_ socket: IPCSocket) -> Client? {
-        func refuse(_ failure: AgentFailure) -> Client? {
+    private func handshake(_ socket: IPCSocket) -> (Client, IPCOutbox)? {
+        func refuse(_ failure: AgentFailure) -> (Client, IPCOutbox)? {
             try? socket.write(IPCMessage.failure(failure))
             return nil
         }
@@ -277,15 +289,16 @@ public final class AgentSocketServer: @unchecked Sendable {
         }
 
         let client = Client(connectionID: UUID(), generation: grant.generation, clientLabel: hello.clientLabel)
-        lock.withLock { connections[client.connectionID] = socket }
-        do {
-            try socket.write(IPCMessage.welcome(
+        let outbox = IPCOutbox(socket: socket)
+        // Registered and welcomed under one lock, so a broadcast either misses this connection or
+        // queues behind the welcome — the helper reads anything before it as a broken handshake.
+        lock.withLock {
+            connections[client.connectionID] = Connection(socket: socket, outbox: outbox)
+            outbox.send(IPCMessage.welcome(
                 profile: identity.profile.runtimeKey, instance: identity.instance,
                 appVersion: identity.appVersion, permission: grant.permission
             ))
-        } catch {
-            return nil
         }
-        return client
+        return (client, outbox)
     }
 }
