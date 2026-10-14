@@ -84,7 +84,12 @@ public final class AgentAccessStore: @unchecked Sendable {
         try save(next)
     }
 
-    /// Clearing history rotates the credential too. Otherwise a disconnected old helper could
+    /// A new credential and a new generation, with the permission unchanged: every configured agent
+    /// stops working until it is given the new configuration, and access stays on for the ones that
+    /// are. What Settings' Rotate does — the fix for a credential that leaked, without the detour
+    /// through turning access off and on again.
+    ///
+    /// Clearing history rotates the same way. Otherwise a disconnected old helper could
     /// authenticate again and replay an old ID into the empty journal under the new generation.
     public func rotateGeneration() throws {
         var next = access

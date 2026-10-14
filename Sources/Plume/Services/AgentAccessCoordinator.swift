@@ -194,9 +194,14 @@ final class AgentAccessCoordinator {
         onChange?()
     }
 
-    /// Destroys the credential and starts a new generation; every configured agent stops working.
-    func revoke() {
-        try? access.revoke()
+    /// A new credential and generation, access left as it is. Open connections are closed, and a
+    /// helper still holding the old credential is refused until its configuration is copied again.
+    func rotateCredential() {
+        do {
+            try access.rotateGeneration()
+        } catch {
+            NSLog("Plume: could not rotate the agent credential — %@", String(describing: error))
+        }
         server?.disconnectAll()
         onChange?()
     }

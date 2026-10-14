@@ -68,34 +68,38 @@ final class AgentSettingsViewController: NSViewController {
         } else {
             status = tr("agent.status.ready")
         }
-        form.card([
+        // One card for everything about connecting: the switch and its state, then — once it is on —
+        // the configuration to copy, the credential inside it, and the help. The shell helper's path
+        // has no row of its own: it is the `command` in the MCP configuration, and the help says so.
+        var rows: [NSView] = [
             SettingsRow(title: tr("agent.access"), explanation: tr("agent.access.explanation"), control: accessPopUp),
             SettingsRow(title: tr("agent.status"), control: SettingsForm.value(status)),
-        ])
-
-        // ---- connect -----------------------------------------------------------------------
+        ]
+        var locationProblem: String?
         if permission != .off {
-            form.header(tr("agent.connect"))
             switch agent.helperLocation {
             case .failure(let problem):
-                form.footnote(problem == .translocated ? tr("agent.location.translocated") : tr("agent.location.readOnly"))
-            case .success(let helper):
+                locationProblem = problem == .translocated ? tr("agent.location.translocated") : tr("agent.location.readOnly")
+            case .success:
                 let copyConfig = SettingsForm.push(tr("agent.copy"), target: self, action: #selector(copyConfiguration(_:)))
-                let copyPath = SettingsForm.push(tr("agent.copy"), target: self, action: #selector(copyHelperPath(_:)))
-                copyPath.toolTip = helper.path
                 let copyToken = SettingsForm.push(tr("agent.copy"), target: self, action: #selector(copyCredential(_:)))
-                let revoke = SettingsForm.push(tr("agent.revoke"), target: self, action: #selector(revokeCredential))
-                let help = SettingsForm.push(tr("agent.help.show"), target: self, action: #selector(showHelp))
-                form.card([
+                let rotate = SettingsForm.push(tr("agent.rotate"), target: self, action: #selector(rotateCredential))
+                rows += [
                     SettingsRow(title: tr("agent.mcp"), explanation: tr("agent.mcp.explanation"), control: copyConfig),
-                    SettingsRow(title: tr("agent.cli"), explanation: tr("agent.cli.explanation"), control: copyPath),
                     SettingsRow(title: tr("agent.credential"), explanation: tr("agent.credential.explanation"),
-                                control: Self.pair(copyToken, revoke)),
-                    SettingsRow(title: tr("agent.help"), control: help),
-                ])
+                                control: Self.pair(copyToken, rotate)),
+                ]
             }
+            rows.append(SettingsRow(
+                title: tr("agent.help"),
+                control: SettingsForm.push(tr("agent.help.show"), target: self, action: #selector(showHelp))
+            ))
+        }
+        form.card(rows)
+        if let locationProblem { form.footnote(locationProblem) }
 
-            // ---- writing -------------------------------------------------------------------
+        if permission != .off {
+            // ---- guidelines: how the agent should write ----------------------------------------
             form.header(tr("agent.writing"))
             form.card([
                 SettingsRow(
@@ -180,11 +184,6 @@ final class AgentSettingsViewController: NSViewController {
         copy(text, sender)
     }
 
-    @objc private func copyHelperPath(_ sender: NSButton) {
-        guard case .success(let helper) = agent.helperLocation else { return }
-        copy(helper.path, sender)
-    }
-
     @objc private func copyCredential(_ sender: NSButton) {
         guard let token = agent.access.token else { return }
         copy(token, sender)
@@ -199,9 +198,9 @@ final class AgentSettingsViewController: NSViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak sender] in sender?.title = original }
     }
 
-    @objc private func revokeCredential() {
-        guard confirm(tr("agent.revoke.title"), tr("agent.revoke.detail"), tr("agent.revoke.button")) else { return }
-        agent.revoke()
+    @objc private func rotateCredential() {
+        guard confirm(tr("agent.rotate.title"), tr("agent.rotate.detail"), tr("agent.rotate.button")) else { return }
+        agent.rotateCredential()
         rebuild()
     }
 

@@ -145,7 +145,7 @@ public final class NoteAccessHandler {
             throw AgentFailure(.accessDisabled, "agent access is turned off in Plume's settings")
         }
         guard current.generation == caller.generation else {
-            throw AgentFailure(.authFailed, "this connection's credential was revoked; copy the new configuration from Plume's settings")
+            throw AgentFailure(.authFailed, "this connection's credential was rotated or revoked; copy the new configuration from Plume's settings")
         }
         guard current.permission.allows(tool) else {
             throw AgentFailure(.permissionDenied, "Plume allows this agent to read notes only; the user can allow changes in Settings")

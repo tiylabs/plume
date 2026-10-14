@@ -381,6 +381,20 @@ func runAgentHandlerTests() {
             Check.equal(rig.call(.listNotes, [:]).failureCode, .authFailed, "the rig's caller was issued before the revoke")
         }
 
+        Check.mainTest("rotating the credential keeps access on but refuses the old one") {
+            let rig = AgentRig(permission: .readWrite)
+            let old = rig.caller!
+            let oldToken = rig.access.token
+            let oldGeneration = rig.access.access.generation
+            try! rig.access.rotateGeneration()
+            Check.equal(rig.access.access.permission, .readWrite, "Rotate is not Off")
+            Check.expect(rig.access.token != nil && rig.access.token != oldToken, "a new credential")
+            Check.expect(rig.access.access.generation != oldGeneration, "a new generation")
+            Check.equal(rig.failure(.listNotes, [:], caller: old)?.code, .authFailed, "the old credential's connection is refused")
+            let fresh = NoteAccessHandler.Caller(generation: rig.access.access.generation, clientLabel: nil)
+            Check.equal(rig.failure(.listNotes, [:], caller: fresh)?.code, nil, "the new one works")
+        }
+
         Check.mainTest("a revoke during a prepared write lets that write settle; the next request is refused") {
             let rig = AgentRig()
             let name = "2026-01-01-1200-rv.md"
