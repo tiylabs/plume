@@ -246,14 +246,17 @@ final class AgentAccessCoordinator {
     func mcpConfiguration() -> String? {
         guard case .success(let helper) = helperLocation, let token = access.token else { return nil }
         let name = profile == .dev ? "plume-dev" : "plume"
+        // `description` is what a client's tool search ranks the server by. Without it a Chinese query
+        // such as "笔记" finds nothing, because the tool descriptions are English. It comes from
+        // `AgentSearchMetadata`. `searchKeywords` is deliberately not copied: see that file.
+        var entry: [String: JSONValue] = [
+            "command": .string(helper.path),
+            "args": .array([.string("mcp")]),
+            "env": .object([AgentAPI.tokenEnvironmentKey: .string(token)]),
+        ]
+        entry.merge(AgentSearchMetadata.serverEntryFields()) { _, new in new }
         let config: JSONValue = .object([
-            "mcpServers": .object([
-                name: .object([
-                    "command": .string(helper.path),
-                    "args": .array([.string("mcp")]),
-                    "env": .object([AgentAPI.tokenEnvironmentKey: .string(token)]),
-                ]),
-            ]),
+            "mcpServers": .object([name: .object(entry)]),
         ])
         return (try? AgentJSON.prettyEncoder.encode(config)).map { String(decoding: $0, as: UTF8.self) }
     }

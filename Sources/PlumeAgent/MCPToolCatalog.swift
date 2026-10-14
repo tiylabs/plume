@@ -8,11 +8,14 @@ import PlumeKit
 /// terms, a fresh UUID per write, re-read after a conflict), and nothing about how Plume is built.
 public enum MCPToolCatalog {
 
+    /// Sent in `initialize` and shown by a client's `describe`. The Chinese phrases map each step to
+    /// the words a Chinese-speaking user says (搜索笔记 = search notes), so the agent can pick the
+    /// right tool for a Chinese request. Tool search does not read this text; see `AgentSearchMetadata`.
     public static let serverInstructions = """
-    Plume is the user's local Markdown notes app. Typical flow: call get_writing_context to learn how \
+    Plume is the user's local Markdown notes app (笔记 / notes). Typical flow: call get_writing_context to learn how \
     Plume renders Markdown and how the user likes notes written; search_notes with short keywords to \
-    find a related note; read_note to get its text and version; then modify_note (exact, unique \
-    replacements against that version) or create_note. Every write needs a new UUID request_id; if a \
+    find a related note (搜索笔记); read_note to get its text and version (读取笔记); then modify_note (exact, unique \
+    replacements against that version, 修改笔记) or create_note (新建笔记). Every write needs a new UUID request_id; if a \
     write times out, call get_operation with the same request_id before retrying. Never resolve Git \
     conflict markers unless the user asked. A success means saved on this Mac, not synced.
     """

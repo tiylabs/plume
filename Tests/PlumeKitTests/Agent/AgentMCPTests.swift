@@ -192,6 +192,36 @@ func runAgentMCPTests() {
         }
     }
 
+    Check.suite("Agent MCP · search metadata") {
+
+        // The copied configuration's `description` is the only search field Plume supplies. Its words
+        // are what a client's search matches a Chinese query against, so the tests pin its shape.
+        Check.test("the server description carries Chinese and English words") {
+            let text = AgentSearchMetadata.serverDescription
+            Check.expect(text.unicodeScalars.contains { $0.value > 0x7F }, "the description has no Chinese word")
+            Check.expect(text.unicodeScalars.contains { $0.value < 0x80 && $0.properties.isAlphabetic }, "the description has no English word")
+            Check.expect(text.contains("笔记"), "a user who types 笔记 must find the server")
+        }
+
+        Check.test("the copied configuration carries description and no searchKeywords") {
+            let fields = AgentSearchMetadata.serverEntryFields()
+            Check.equal(fields["description"]?.stringValue, AgentSearchMetadata.serverDescription)
+            // Pinned: a keyword table makes the pasted JSON much longer, so it stays out of the copy.
+            Check.equal(fields["searchKeywords"], nil, "searchKeywords must not be copied")
+            Check.equal(fields.count, 1, "only description is copied")
+            // The JSON that reaches the user must round-trip, so the paste is valid.
+            let data = try! AgentJSON.encoder.encode(fields)
+            Check.equal(try? AgentJSON.decoder.decode(JSONValue.self, from: data), .object(fields))
+        }
+
+        Check.test("MCP instructions name the Chinese and English words too") {
+            let text = MCPToolCatalog.serverInstructions
+            Check.expect(text.contains("笔记"), "instructions have no Chinese word")
+            Check.expect(text.contains("notes"), "instructions have no English word")
+            Check.expect(text.contains("搜索笔记"), "instructions do not map search_notes to its Chinese phrase")
+        }
+    }
+
     Check.suite("Agent CLI") {
         func parse(_ args: [String], input: String = "") -> HelperCommand? {
             try? HelperCommand.parse(args) { _ in Data(input.utf8) }
