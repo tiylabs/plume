@@ -121,25 +121,40 @@ public enum NoteChangePlanner {
     }
 
     /// Start offsets of `needle` in `haystack` that sit on grapheme boundaries at both ends, up to
-    /// `limit` of them (two is enough to know a match is not unique).
+    /// `limit` of them (two is enough to know a match is not unique). Overlapping occurrences count:
+    /// `aa` is ambiguous in `aaa`.
+    ///
+    /// Knuth–Morris–Pratt, so the cost is linear in both lengths whatever the text. Comparing afresh
+    /// at every offset is quadratic on repetitive text, and this runs on the main actor: measured
+    /// with `-O`, that matcher took 0.58, 2.20 and 8.87 s on notes of 80k, 160k and 320k repeated
+    /// characters and an `old_text` of half as many plus one more — all well under the 1 MiB limit.
     static func occurrences(
         of needle: [Unicode.Scalar], in haystack: [Unicode.Scalar], boundaries: [Bool], limit: Int
     ) -> [Int] {
         guard !needle.isEmpty, needle.count <= haystack.count else { return [] }
+
+        // fallback[k]: the length of the longest proper prefix of needle[0...k] that is also a
+        // suffix of it — how much of a partial match survives a mismatch after it.
+        var fallback = [Int](repeating: 0, count: needle.count)
+        var k = 0
+        for q in needle.indices.dropFirst() {
+            while k > 0, needle[q] != needle[k] { k = fallback[k - 1] }
+            if needle[q] == needle[k] { k += 1 }
+            fallback[q] = k
+        }
+
         var found: [Int] = []
-        let first = needle[0]
-        var i = 0
-        let last = haystack.count - needle.count
-        while i <= last {
-            if haystack[i] == first, boundaries[i], boundaries[i + needle.count] {
-                var j = 1
-                while j < needle.count, haystack[i + j] == needle[j] { j += 1 }
-                if j == needle.count {
-                    found.append(i)
-                    if found.count >= limit { break }
-                }
+        var matched = 0
+        for (i, scalar) in haystack.enumerated() {
+            while matched > 0, scalar != needle[matched] { matched = fallback[matched - 1] }
+            if scalar == needle[matched] { matched += 1 }
+            guard matched == needle.count else { continue }
+            let start = i + 1 - needle.count
+            if boundaries[start], boundaries[i + 1] {
+                found.append(start)
+                if found.count >= limit { break }
             }
-            i += 1
+            matched = fallback[matched - 1]
         }
         return found
     }

@@ -30,6 +30,20 @@ func runAgentDomainTests() {
 
         Check.test("overlapping occurrences of the same text are ambiguous") {
             Check.expect((try? NoteChangePlanner.apply([.replace("aa", with: "b")], to: "aaa\n")) == nil)
+            Check.expect((try? NoteChangePlanner.apply([.replace("abab", with: "x")], to: "ababab\n")) == nil)
+            Check.equal(try? NoteChangePlanner.apply([.replace("abac", with: "x")], to: "ababac\n"), "abx\n", "a partial match that fails resumes inside itself")
+        }
+
+        // Comparing afresh at every offset took 8.87 s (with -O) for one such replace on a 320k
+        // character note. The debug build would take far longer still; linear time finishes at once.
+        Check.test("a long repetitive passage is matched in linear time") {
+            let base = "# T\n" + String(repeating: "ab", count: 150_000) + "c\n"
+            let needle = String(repeating: "ab", count: 75_000) + "c"
+            let started = Date()
+            let out = try? NoteChangePlanner.apply([.replace(needle, with: "X")], to: base)
+            let took = Date().timeIntervalSince(started)
+            Check.equal(out, "# T\n" + String(repeating: "ab", count: 75_000) + "X\n")
+            Check.expect(took < 3, "took \(took) s")
         }
 
         Check.test("append adds at the end, at most once, with the agent's own spacing") {
