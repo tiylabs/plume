@@ -9,7 +9,7 @@
 # Usage:
 #   Scripts/check-commit-msg.sh <base> <head>   check every commit in base..head
 #   Scripts/check-commit-msg.sh <commit>        check one commit
-#   Scripts/check-commit-msg.sh                 check the commits on HEAD that origin/dev lacks
+#   Scripts/check-commit-msg.sh                 check the commits on HEAD that origin/master lacks
 #
 # Merge commits and the `fixup!`/`squash!` autosquash prefixes are skipped for merges and rejected
 # for the latter, since they must not reach a shared branch.
@@ -24,7 +24,7 @@ if [ "$#" -eq 2 ]; then
 elif [ "$#" -eq 1 ]; then
   RANGE="$1^!"
 else
-  RANGE="origin/dev..HEAD"
+  RANGE="origin/master..HEAD"
 fi
 
 COMMITS=$(git rev-list --no-merges "$RANGE")

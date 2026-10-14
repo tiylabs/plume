@@ -52,7 +52,7 @@ if [[ "$actual" -gt "$baseline" ]]; then
 	echo "✗ $actual references to unpublished documents, but the baseline allows $baseline." >&2
 	echo "  Explain the reason in the comment itself instead of citing 'decision N', 'frame Xy' or LAB.md." >&2
 	base=
-	for ref in origin/dev origin/master master; do
+	for ref in origin/master master; do
 		base=$(git merge-base HEAD "$ref" 2>/dev/null) && break || base=
 	done
 	echo "  Matches added since ${base:-the first commit}:" >&2
