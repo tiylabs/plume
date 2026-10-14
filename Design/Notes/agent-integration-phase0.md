@@ -80,6 +80,7 @@
 | 后台延迟（App Nap） | helper 用 `open -g` 拉起 Dev 包，Panel 未显示，App 为 accessory | 拉起加 `tools/list` 0.29–0.40 s；创建 20 ms、搜索 4 ms、读取 3 ms、修改 20 ms。请求期间都在 `beginActivity(.userInitiated)` 内 |
 | 未配置凭据 | 不设置 `PLUME_AGENT_TOKEN` 调用 CLI | 退出码 1，返回 `AUTH_FAILED`，App 未被拉起 |
 | 停放的 Panel 仍是 key window | smoke 首次运行时，后台启动的 App 对屏幕外 Panel 报告 `isKeyWindow == true` | “用户在编辑”改为同时要求 Panel 已唤出且为 key window |
+| 启动时的就绪状态 | 在 `prepare()` 之前就报告“Vault 不可用” | smoke 实测：Vault 正常时，helper 在恢复完成前会收到不可重试的 `VAULT_UNAVAILABLE`。现改为只在 chooser 实际弹出时报告，选定文件夹后恢复；其余时间为可重试的 `APP_NOT_READY` |
 | Dev 包 | `Scripts/build-app.sh --debug` | helper 为 `x86_64 arm64`，标识 `com.tiylabs.plume.dev.agent`，`codesign --verify --deep --strict` 通过 |
 
 端到端 smoke 脚本：`Scripts/smoke/agent-smoke.sh`。脚本会备份并恢复 `Plume (Debug)` 支持目录，只使用临时 Vault。
