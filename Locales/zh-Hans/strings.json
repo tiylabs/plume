@@ -370,7 +370,7 @@
   "agent.mcp": "MCP 配置",
   "agent.mcp.explanation": "用于能启动本地 MCP 服务的 Agent。其中包含你的凭据。",
   "agent.cli": "命令行工具",
-  "agent.cli.explanation": "用于能执行 Shell 命令的 Agent。把 PLUME_AGENT_TOKEN 设为凭据。",
+  "agent.cli.explanation": "用于能执行 Shell 命令的 Agent。把 PLUME_CLI_TOKEN 设为凭据。",
   "agent.credential": "凭据",
   "agent.credential.explanation": "撤销后，所有已配置的 Agent 都会停止工作，直到你重新拷贝配置。",
   "agent.copy": "拷贝",

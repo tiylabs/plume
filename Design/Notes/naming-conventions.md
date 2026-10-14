@@ -11,7 +11,7 @@ Sources/PlumeKit/        Foundation only. Anything that can be tested without a 
 Sources/Plume/           AppKit, WebKit, Carbon. The app itself.
   App/  Panel/  Bridge/  Spaces/  MenuBar/  Services/  Settings/
 Sources/PlumeAgent/      The helper's logic (MCP server, CLI, IPC client); Foundation only, tested.
-Sources/PlumeAgentHelper/ The helper's entry point, built as Contents/MacOS/plume-agent.
+Sources/PlumeAgentHelper/ The helper's entry point, built as Contents/MacOS/plume-cli.
 Sources/DockSpaceProbe/  A diagnostic executable for Dock "Assign To" detection; not part of the app.
 Tests/PlumeKitTests/     The PlumeKit suite — an executable, not an XCTest target (see Package.swift).
 Editor/src/              The web layer: bridge/  editor/  format/  markdown/  keyboard/  ui/  styles/
@@ -39,8 +39,14 @@ AppKit; if a type needs it, the type belongs in `Sources/Plume`.
 | Checking for a newer version | **Release** (`ReleaseCheck`, `ReleaseFetcher`) | Update, except in text users read |
 | The development build | **Dev** (`BuildProfile.dev`, "Plume Dev", `Plume-dev`) | Scratch |
 | The user's own AI program | **Agent** — only ever the user's, never Plume's code | Assistant, bot |
-| `plume-agent`, shipped inside the app | **helper** | agent, CLI (the CLI is one of its modes) |
+| `plume-cli`, shipped inside the app | **helper** | agent, CLI (the CLI is one of its modes) |
 | One create, modify or restore through the API | **Operation** (`OperationRecord`, `OperationJournal`) | Job, transaction |
+
+The helper's file is `plume-cli`, not `plume-agent`: it is the tool an agent calls, not an agent, and
+**Agent** is reserved for the user's program. Not plain `plume` either: APFS is case-insensitive by
+default, so `Contents/MacOS/plume` would be the same file as the app's own `Contents/MacOS/Plume`.
+Its credential variable follows the file name (`PLUME_CLI_TOKEN`); the feature, the Settings tab and
+the Swift modules keep **Agent**, because that is what they are about.
 
 `Plume` is the product. It appears in the module name `PlumeKit`, in bundle identifiers and log
 subsystems, in the `plumeHost` bridge object, and in the CSS prefix. It is not a word for "the panel".
@@ -97,7 +103,7 @@ this repository cannot repair. They are checked by tests; a refactor that touche
 | `.plume-*`, `.plume`, `.plume__*`, `#plume*`, `data-plume-*`, and the CSS custom properties | user themes in `~/Library/Application Support/Plume/Themes` | `Editor/tests/theme-contract.mjs`, `theme-api.txt` |
 | `window.plumeHost`, `messageHandlers.plume`, the message and host method names | both ends of the bridge | `Tests/PlumeKitTests/Bridge/BridgeContractTests.swift` (reads `Editor/src/bridge/protocol.ts`) |
 | Bundle identifiers, `Plume` and `Plume (Debug)` support folders, the `PlumeScratchBuild` Info.plist key | macOS | CI bundle checks, `Scripts/test-dev-isolation.sh` |
-| `Contents/MacOS/plume-agent`, its `mcp` subcommand and CLI commands, `PLUME_AGENT_TOKEN` | users' agent configurations | `AgentMCPTests`, `Scripts/smoke/agent-smoke.sh` |
+| `Contents/MacOS/plume-cli`, its `mcp` subcommand and CLI commands, `PLUME_CLI_TOKEN` | users' agent configurations | `AgentMCPTests`, `Scripts/smoke/agent-smoke.sh` |
 | The seven tool names, their argument and result fields, the error codes (`AgentErrorCode`) | agents' prompts and scripts | `AgentDomainTests`, `AgentMCPTests` |
 | `Agent/access.json`, `Agent/token`, `Agent/preferences.md`, `Agent/Templates/`, `Agent/Operations/` | the user's disk | `AgentHandlerTests` |
 

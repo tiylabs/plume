@@ -56,7 +56,7 @@ cask "plume" do
     .md files in ~/Documents/Plume.
 
     Agent access (Settings > Agent) is off by default. When you turn it on, the
-    plume-agent helper inside the app talks to Plume over a local Unix socket on
+    plume-cli helper inside the app talks to Plume over a local Unix socket on
     this Mac only; it adds no network requests. What your agent does with notes
     it reads is up to the agent.
   EOS

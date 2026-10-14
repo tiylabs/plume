@@ -11,7 +11,7 @@
 #   3. Points the Dev profile at a fresh temporary vault and turns agent access on (read_write),
 #      exactly as Settings would: Agent/access.json and a 0600 Agent/token.
 #   4. Checks that a call without a credential fails with AUTH_FAILED and does NOT launch the app.
-#   5. Drives `plume-agent mcp` over stdio (initialize → tools/list → create → search → read →
+#   5. Drives `plume-cli mcp` over stdio (initialize → tools/list → create → search → read →
 #      modify → get_operation), letting the helper launch the app in the background.
 #   6. Runs the same flow through the CLI and checks both produce the same result shapes.
 #   7. Quits Plume Dev and restores the backup.
@@ -21,7 +21,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP="${1:-$ROOT/build/Plume Dev.app}"
-HELPER="$APP/Contents/MacOS/plume-agent"
+HELPER="$APP/Contents/MacOS/plume-cli"
 SUPPORT="$HOME/Library/Application Support/Plume (Debug)"
 
 [[ -x "$HELPER" ]] || { echo "error: no helper at $HELPER — run make dev first" >&2; exit 2; }
@@ -32,7 +32,7 @@ if pgrep -f '/Plume Dev.app/Contents/MacOS/Plume' >/dev/null; then
 	exit 2
 fi
 
-WORK="$(mktemp -d /tmp/plume-agent-smoke.XXXXXX)"
+WORK="$(mktemp -d /tmp/plume-cli-smoke.XXXXXX)"
 VAULT="$WORK/vault"
 BACKUP="$WORK/support-backup"
 mkdir -p "$VAULT"
@@ -78,7 +78,7 @@ TOKEN="$(tr -d '\n' < "$SUPPORT/Agent/token")"
 
 echo "==> no credential: AUTH_FAILED, and the app is not launched"
 set +e
-OUT="$(env -u PLUME_AGENT_TOKEN "$HELPER" notes list --json)"
+OUT="$(env -u PLUME_CLI_TOKEN "$HELPER" notes list --json)"
 STATUS=$?
 set -e
 [[ $STATUS -eq 1 ]] || { echo "expected exit 1, got $STATUS"; exit 1; }
@@ -88,7 +88,7 @@ if pgrep -f "$APP/Contents/MacOS/Plume" >/dev/null; then echo "the app was launc
 echo "    ok"
 
 echo "==> MCP over stdio, then the CLI"
-PLUME_AGENT_TOKEN="$TOKEN" python3 - "$HELPER" "$VAULT" <<'PY'
+PLUME_CLI_TOKEN="$TOKEN" python3 - "$HELPER" "$VAULT" <<'PY'
 import json, os, subprocess, sys, time, uuid
 helper, vault = sys.argv[1:]
 

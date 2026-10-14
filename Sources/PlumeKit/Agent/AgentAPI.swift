@@ -22,10 +22,10 @@ public enum AgentAPI {
 
     /// The environment variable the helper reads its credential from. It is written into the user's
     /// agent configuration, so it is a frozen name.
-    public static let tokenEnvironmentKey = "PLUME_AGENT_TOKEN"
+    public static let tokenEnvironmentKey = "PLUME_CLI_TOKEN"
 
     /// The helper's file name inside `Contents/MacOS/`. Also written into agent configurations.
-    public static let helperExecutableName = "plume-agent"
+    public static let helperExecutableName = "plume-cli"
 }
 
 /// Every bound the API enforces. Public numbers, documented in the connection help, and checked by

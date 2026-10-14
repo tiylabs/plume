@@ -4,7 +4,7 @@ Plume lets an AI agent on this Mac work with your notes through a small helper i
 2. If your agent supports local MCP servers, press Copy next to MCP configuration and paste it
    into the agent's MCP settings (for many agents, an "mcpServers" section). Restart the agent.
 3. If your agent runs shell commands instead, use the command-line helper with the credential in
-   PLUME_AGENT_TOKEN, for example: plume-agent notes search --query "project".
+   PLUME_CLI_TOKEN, for example: plume-cli notes search --query "project".
 
 The agent can search and read notes, read your writing preferences and templates, create notes and
 change parts of a note. It cannot delete notes, move your notes folder, change settings or run Git.

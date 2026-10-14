@@ -11,7 +11,7 @@ import Foundation
 ///
 /// **Short.** A Unix socket path is limited to 104 bytes (`sun_path`), and the Application Support
 /// path is long enough with a long user name to run past it. Measured here:
-/// `/var/folders/xx/<28 chars>/T/` is 49 bytes; `plume-agent.<profile>/agent.sock` adds at most 28.
+/// `/var/folders/xx/<28 chars>/T/` is 49 bytes; `plume-cli.<profile>/agent.sock` adds at most 28.
 ///
 /// **Checked, both ends.** The directory must be a real directory (not a symlink), owned by this
 /// user, `0700`; the socket must be a socket owned by this user. A planted symlink or a same-named
@@ -25,7 +25,7 @@ public struct AgentRuntimeDirectory: Sendable, Equatable {
 
     /// The directory for `profile`, under the user's temporary directory.
     public static func standard(profile: BuildProfile) -> AgentRuntimeDirectory {
-        AgentRuntimeDirectory(directory: userTemporaryDirectory().appendingPathComponent("plume-agent.\(profile.runtimeKey)"))
+        AgentRuntimeDirectory(directory: userTemporaryDirectory().appendingPathComponent("plume-cli.\(profile.runtimeKey)"))
     }
 
     public var socketURL: URL { directory.appendingPathComponent("agent.sock") }

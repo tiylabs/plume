@@ -293,10 +293,10 @@ func runAgentIPCTests() {
             if scratch { plist[BuildProfile.infoKey] = true }
             try! PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
                 .write(to: app.appendingPathComponent("Contents/Info.plist"))
-            try! Data("#!/bin/sh\n".utf8).write(to: macOS.appendingPathComponent("plume-agent"))
+            try! Data("#!/bin/sh\n".utf8).write(to: macOS.appendingPathComponent("plume-cli"))
             return app
         }
-        func helper(_ app: URL) -> String { app.appendingPathComponent("Contents/MacOS/plume-agent").path }
+        func helper(_ app: URL) -> String { app.appendingPathComponent("Contents/MacOS/plume-cli").path }
 
         Check.test("the app's own Info.plist decides the profile") {
             Check.equal(try? AgentInstallLocation.resolve(executablePath: helper(bundle("com.tiylabs.plume"))).profile, .release)
@@ -319,7 +319,7 @@ func runAgentIPCTests() {
         Check.test("outside a bundle it refuses; through a symlink it resolves to the bundle") {
             let loose = FileManager.default.temporaryDirectory.appendingPathComponent("loose-\(UUID().uuidString)")
             try! FileManager.default.createDirectory(at: loose, withIntermediateDirectories: true)
-            let copy = loose.appendingPathComponent("plume-agent")
+            let copy = loose.appendingPathComponent("plume-cli")
             try! Data().write(to: copy)
             do {
                 _ = try AgentInstallLocation.resolve(executablePath: copy.path)
@@ -329,13 +329,13 @@ func runAgentIPCTests() {
             } catch {}
 
             let app = bundle("com.tiylabs.plume.dev")
-            let link = loose.appendingPathComponent("linked-plume-agent")
+            let link = loose.appendingPathComponent("linked-plume-cli")
             try! FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: helper(app))
             let resolved = try? AgentInstallLocation.resolve(executablePath: link.path)
             Check.equal(resolved?.profile, .dev)
             Check.equal(resolved?.appBundle.lastPathComponent, "Plume Dev.app")
 
-            let wrongLink = app.appendingPathComponent("Contents/MacOS/plume-agent-link")
+            let wrongLink = app.appendingPathComponent("Contents/MacOS/plume-cli-link")
             try! FileManager.default.createSymbolicLink(atPath: wrongLink.path, withDestinationPath: copy.path)
             Check.expect((try? AgentInstallLocation.resolve(executablePath: wrongLink.path)) == nil, "a link inside a bundle to a loose copy is still loose")
         }

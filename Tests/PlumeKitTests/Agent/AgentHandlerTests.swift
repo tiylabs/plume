@@ -237,7 +237,7 @@ func runAgentHandlerTests() {
                 Check.equal(failure.details?["reason"], "name_taken")
             } catch {}
             Check.equal(rig.disk("2026-01-01-1200-taken.md"), "# someone else's\n")
-            Check.equal((try? FileManager.default.contentsOfDirectory(atPath: rig.vaultURL.path))?.filter { $0.hasPrefix(".plume-agent") }, [], "no temporary left behind")
+            Check.equal((try? FileManager.default.contentsOfDirectory(atPath: rig.vaultURL.path))?.filter { $0.hasPrefix(".plume-cli") }, [], "no temporary left behind")
         }
     }
 

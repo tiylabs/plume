@@ -4,7 +4,7 @@ import Foundation
 /// Which app a helper belongs to, decided from where the helper really is on disk.
 ///
 /// The rule: resolve the executable's real path (every symlink followed); it must sit at
-/// `<Something>.app/Contents/MacOS/plume-agent`; that app's own `Info.plist` names the profile. A
+/// `<Something>.app/Contents/MacOS/plume-cli`; that app's own `Info.plist` names the profile. A
 /// helper anywhere else — a symlink into a bundle is fine, but a copy in `.build/` or `~/bin` is not —
 /// refuses to run.
 ///
@@ -31,11 +31,11 @@ public struct AgentInstallLocation: Sendable, Equatable {
         public var description: String {
             switch self {
             case .notInAppBundle(let path):
-                "plume-agent must run from inside Plume.app (Contents/MacOS); it is at \(path). Use the path shown in Plume's settings."
+                "plume-cli must run from inside Plume.app (Contents/MacOS); it is at \(path). Use the path shown in Plume's settings."
             case .unreadableInfoPlist(let path):
-                "cannot read the Info.plist of the app containing plume-agent: \(path)"
+                "cannot read the Info.plist of the app containing plume-cli: \(path)"
             case .unknownBundle(let identifier):
-                "plume-agent is inside an app that is not Plume (\(identifier))"
+                "plume-cli is inside an app that is not Plume (\(identifier))"
             }
         }
     }

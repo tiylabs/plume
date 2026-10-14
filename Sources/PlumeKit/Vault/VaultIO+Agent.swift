@@ -74,7 +74,7 @@ extension VaultIO {
         let written: Result<String, AgentFailure>? = gate.withGate(timeout: gateTimeout) {
             coordinatedWrite(url) { actual in
                 let folder = actual.deletingLastPathComponent()
-                let temporary = folder.appendingPathComponent(".plume-agent-\(UUID().uuidString).tmp")
+                let temporary = folder.appendingPathComponent(".plume-cli-\(UUID().uuidString).tmp")
                 try data.write(to: temporary, options: [.withoutOverwriting])
                 guard renamex_np(temporary.path, actual.path, UInt32(RENAME_EXCL)) == 0 else {
                     let code = errno

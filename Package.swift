@@ -15,10 +15,10 @@ let package = Package(
     products: [
         .executable(name: "Plume", targets: ["Plume"]),
         .library(name: "PlumeKit", targets: ["PlumeKit"]),
-        // The helper an agent starts (`plume-agent mcp`) or a shell runs (`plume-agent notes …`). It
-        // ships inside Plume.app at Contents/MacOS/plume-agent and talks to the running app over a
+        // The helper an agent starts (`plume-cli mcp`) or a shell runs (`plume-cli notes …`). It
+        // ships inside Plume.app at Contents/MacOS/plume-cli and talks to the running app over a
         // local socket; it never touches the vault itself.
-        .executable(name: "plume-agent", targets: ["PlumeAgentHelper"]),
+        .executable(name: "plume-cli", targets: ["PlumeAgentHelper"]),
     ],
     targets: [
         .target(name: "PlumeKit"),

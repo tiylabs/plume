@@ -30,7 +30,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP="${1:-$ROOT/build/Plume Dev.app}"
-HELPER="$APP/Contents/MacOS/plume-agent"
+HELPER="$APP/Contents/MacOS/plume-cli"
 SUPPORT="$HOME/Library/Application Support/Plume (Debug)"
 
 [[ -x "$HELPER" ]] || { echo "error: no helper at $HELPER — run make dev first" >&2; exit 2; }
@@ -41,7 +41,7 @@ if pgrep -f '/Plume Dev.app/Contents/MacOS/Plume' >/dev/null; then
 	exit 2
 fi
 
-WORK="$(mktemp -d /tmp/plume-agent-lifecycle.XXXXXX)"
+WORK="$(mktemp -d /tmp/plume-cli-lifecycle.XXXXXX)"
 BACKUP="$WORK/support-backup"
 HAD_SUPPORT=0
 if [[ -d "$SUPPORT" ]]; then
@@ -113,7 +113,7 @@ def configure(vault, ever_created=True):
     return token
 
 def cli(token, *args, stdin=None):
-    env = dict(os.environ, PLUME_AGENT_TOKEN=token)
+    env = dict(os.environ, PLUME_CLI_TOKEN=token)
     run = subprocess.run([helper, *args, "--json"], input=stdin, capture_output=True, text=True, env=env, timeout=60)
     try:
         body = json.loads(run.stdout) if run.stdout.strip() else {}

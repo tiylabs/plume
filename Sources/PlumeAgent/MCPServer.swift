@@ -33,7 +33,7 @@ public final class MCPServer: @unchecked Sendable {
     private let write: @Sendable (String) -> Void
     private let log: @Sendable (String) -> Void
     private let serverVersion: String
-    private let work = DispatchQueue(label: "plume-agent.mcp.calls", attributes: .concurrent)
+    private let work = DispatchQueue(label: "plume-cli.mcp.calls", attributes: .concurrent)
     private let inFlightGroup = DispatchGroup()
 
     private let lock = NSLock()
@@ -176,7 +176,7 @@ public final class MCPServer: @unchecked Sendable {
         let permission = (try? backend.connect()) ?? backend.permission
         lock.withLock { listedPermission = permission }
         if permission == nil {
-            log("plume-agent: Plume is not reachable yet; listing every tool, calls will report why")
+            log("plume-cli: Plume is not reachable yet; listing every tool, calls will report why")
         }
         send(result: .object(["tools": .array(MCPToolCatalog.tools(for: permission))]), id: id)
     }

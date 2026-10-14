@@ -2,12 +2,12 @@ import Foundation
 import PlumeAgent
 import PlumeKit
 
-// plume-agent: the helper Plume ships inside its bundle. See `HelperCommand` for the commands and
+// plume-cli: the helper Plume ships inside its bundle. See `HelperCommand` for the commands and
 // `AgentClient` for how it reaches the running app. stdout is protocol or result JSON only;
 // everything else goes to stderr.
 
 func fail(_ message: String, code: Int32) -> Never {
-    FileHandle.standardError.write(Data(("plume-agent: " + message + "\n").utf8))
+    FileHandle.standardError.write(Data(("plume-cli: " + message + "\n").utf8))
     exit(code)
 }
 
@@ -38,7 +38,7 @@ do {
 }
 
 if command == .version {
-    print("plume-agent \(location.appVersion) (\(location.profile.displayName), api \(AgentAPI.apiVersion), ipc \(AgentAPI.ipcMajorVersion))")
+    print("plume-cli \(location.appVersion) (\(location.profile.displayName), api \(AgentAPI.apiVersion), ipc \(AgentAPI.ipcMajorVersion))")
     exit(0)
 }
 
@@ -57,7 +57,7 @@ case .mcp:
     server.run()
     exit(0)
 case .call(let tool, let params, let compact):
-    let client = AgentClient(location: location, token: token, clientLabel: "plume-agent CLI")
+    let client = AgentClient(location: location, token: token, clientLabel: "plume-cli CLI")
     let status = HelperCommand.run(tool, params, compact: compact, backend: client) { print($0) }
     exit(status)
 case .help, .version:

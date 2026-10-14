@@ -99,7 +99,7 @@ public final class AgentClient: @unchecked Sendable {
             case .failure(.blocked(let code)):
                 throw AgentFailure(
                     .connectionBlocked,
-                    "the agent's sandbox refused the connection to Plume (\(String(cString: strerror(code)))). Start plume-agent as an MCP server from the agent's configuration, or allow local sockets in the agent's sandbox settings",
+                    "the agent's sandbox refused the connection to Plume (\(String(cString: strerror(code)))). Start plume-cli as an MCP server from the agent's configuration, or allow local sockets in the agent's sandbox settings",
                     details: ["socket": runtime.socketURL.path]
                 )
             case .failure(.foreignPath):
@@ -194,7 +194,7 @@ public final class AgentClient: @unchecked Sendable {
                 self._permission = permission
             }
             let thread = Thread { [weak self] in self?.readLoop(socket) }
-            thread.name = "plume-agent.reader"
+            thread.name = "plume-cli.reader"
             thread.start()
             return permission
         case .error:

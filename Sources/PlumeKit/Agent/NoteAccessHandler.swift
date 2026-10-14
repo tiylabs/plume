@@ -30,7 +30,7 @@ public final class NoteAccessHandler {
     let access: AgentAccessStore
     let writing: WritingFiles
     let rateLimiter: AgentRateLimiter
-    let journalQueue = DispatchQueue(label: "com.tiylabs.plume.agent.journal", qos: .userInitiated)
+    let journalQueue = DispatchQueue(label: "com.tiylabs.plume.cli-journal", qos: .userInitiated)
 
     /// The open note's session, if a panel exists.
     public weak var session: (any AgentSessionGating)?

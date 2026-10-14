@@ -18,7 +18,7 @@
 | v1 | 2026-10-13 | 初稿 |
 | v2 | 2026-10-14 | 对照代码 review：每次 summon 都会重置撤销历史，⌘Z 承诺收窄到 Panel 可见时；补充 TCC、helper 真实路径与 profile 解析、App Translocation、启动时的 Vault chooser、App Nap、沙箱化 Shell；凭据改存 `0600` 文件；明确行结束、Git 冲突标记、写入速率上限与格式语法；补充 lint 棘轮、命名、打包约束及对应验收项 |
 | v3 | 2026-10-14 | 收窄首版范围：会话当前笔记改为写盘后重载，Panel 有焦点或有未保存输入时返回 `NOTE_BUSY`；读取只返回磁盘内容；首版不提供 ⌘Z 撤销 Agent 修改；编辑器事务、revision 与 barrier 移到第 14.1 节；相应精简操作状态、错误码、阶段与验收项 |
-| v3.1 | 2026-10-14 | 设置页不提供“选择范例”，范例只由 `example_refs` 指定（第 9.2 节）；状态改为首版代码完成，余下手工验收见验收清单 |
+| v3.1 | 2026-10-14 | 设置页不提供“选择范例”，范例只由 `example_refs` 指定（第 9.2 节）；状态改为首版代码完成，余下手工验收见验收清单；发布前把 helper 由 `plume-agent` 改名为 `plume-cli`、凭据变量由 `PLUME_AGENT_TOKEN` 改为 `PLUME_CLI_TOKEN`（理由见[命名约定](naming-conventions.md)） |
 
 ## 1. 目标与关键决定
 
@@ -90,8 +90,8 @@
 
 ```mermaid
 flowchart TD
-    Agent[用户自己的 Agent] --> MCP[plume-agent mcp · stdio]
-    Shell[Shell Agent 或用户脚本] --> CLI[plume-agent CLI · JSON]
+    Agent[用户自己的 Agent] --> MCP[plume-cli mcp · stdio]
+    Shell[Shell Agent 或用户脚本] --> CLI[plume-cli CLI · JSON]
     MCP --> Client[共用的类型化 IPC 客户端]
     CLI --> Client
     Client --> IPC[当前用户的 Unix domain socket]
@@ -107,7 +107,7 @@ flowchart TD
 
 ### 3.2 辅助程序与安装
 
-拟新增 SwiftPM 可执行 product `plume-agent`，随 App 分发到 `Plume.app/Contents/MacOS/plume-agent`。同一程序提供 `mcp` 子命令和普通 CLI，不维护两套笔记业务逻辑。
+拟新增 SwiftPM 可执行 product `plume-cli`，随 App 分发到 `Plume.app/Contents/MacOS/plume-cli`。同一程序提供 `mcp` 子命令和普通 CLI，不维护两套笔记业务逻辑。
 
 - 设置中的连接配置使用当前 App 的实际绝对路径；支持 Applications 之外的安装位置。App 被 Gatekeeper 随机化路径（App Translocation）或运行在只读卷（如挂载的 DMG）时，这个路径下次启动就会失效：设置不生成配置，提示先把 App 移到固定位置。
 - 可选的用户级 CLI 链接只是便利功能，不依赖 `/usr/local/bin`、Homebrew 前缀或管理员权限。Homebrew 用户可由 cask 的 `binary` stanza 提供链接，在 [Packaging/plume.rb](../../Packaging/plume.rb) 中与应用一起评审。
@@ -524,10 +524,10 @@ helper 只从客户端配置获取凭据，不读取应用端的凭据文件；�
 {
   "mcpServers": {
     "plume": {
-      "command": "/Applications/Plume.app/Contents/MacOS/plume-agent",
+      "command": "/Applications/Plume.app/Contents/MacOS/plume-cli",
       "args": ["mcp"],
       "env": {
-        "PLUME_AGENT_TOKEN": "<从 Plume 连接设置获取的凭据>"
+        "PLUME_CLI_TOKEN": "<从 Plume 连接设置获取的凭据>"
       }
     }
   }
@@ -537,12 +537,12 @@ helper 只从客户端配置获取凭据，不读取应用端的凭据文件；�
 示例 CLI：
 
 ```sh
-plume-agent context --json
-plume-agent notes search --query 'Agent 接入' --json
-plume-agent notes read --ref 'note:opaque-reference' --json
-plume-agent notes create --input ./note.md --request-id '<UUID>' --json
-plume-agent notes modify --input ./changes.json --json
-plume-agent operations get --request-id '<UUID>' --json
+plume-cli context --json
+plume-cli notes search --query 'Agent 接入' --json
+plume-cli notes read --ref 'note:opaque-reference' --json
+plume-cli notes create --input ./note.md --request-id '<UUID>' --json
+plume-cli notes modify --input ./changes.json --json
+plume-cli operations get --request-id '<UUID>' --json
 ```
 
 正文来自 UTF-8 文件或 stdin，不要求用户把长文本、换行或凭据放入 Shell 命令字符串。`modify` JSON 与工具输入一致。
@@ -583,9 +583,9 @@ PlumeKit 不引入 AppKit、WebKit、Carbon 或 MCP SDK。新协调类型用 `Co
 
 `NoteSession.swift` 已接近 SwiftLint 棘轮（`file_length` 错误阈值 800、`type_body_length` 450；[.swiftlint.yml](../../.swiftlint.yml) 记录的实测为 702 行、类型体 380 行）。Agent 修改相关逻辑放在 `NoteSession+Agent.swift` 或独立类型中，不在原文件内增长，也不调高阈值。
 
-新词汇同步写进命名约定：**Agent** 只指用户自己的 AI Agent，随 App 分发的 `plume-agent` 在代码和文档中称 **helper**，一次创建或修改称 **Operation**；布局增加 `Sources/PlumeKit/Agent/` 与 `Sources/PlumeAgent/`；缩写表增加 `MCP`、`IPC`、`CLI`。README 与 cask `caveats` 中关于隐私和网络的说明补充本机 socket 与 helper；本功能不增加网络请求。
+新词汇同步写进命名约定：**Agent** 只指用户自己的 AI Agent，随 App 分发的 `plume-cli` 在代码和文档中称 **helper**，一次创建或修改称 **Operation**；布局增加 `Sources/PlumeKit/Agent/` 与 `Sources/PlumeAgent/`；缩写表增加 `MCP`、`IPC`、`CLI`。README 与 cask `caveats` 中关于隐私和网络的说明补充本机 socket 与 helper；本功能不增加网络请求。
 
-公开的 MCP 工具名、CLI 参数、领域错误码与新存储键发布后也成为兼容面。helper 在 bundle 中的路径与可执行文件名、`mcp` 子命令和凭据环境变量名（如 `PLUME_AGENT_TOKEN`）写在用户的 Agent 配置里，同样列入命名约定的不可改名表。`api_version`、IPC 主版本与 Markdown 格式能力版本独立；主版本不匹配拒绝连接，增加可选字段应保持兼容。
+公开的 MCP 工具名、CLI 参数、领域错误码与新存储键发布后也成为兼容面。helper 在 bundle 中的路径与可执行文件名、`mcp` 子命令和凭据环境变量名（如 `PLUME_CLI_TOKEN`）写在用户的 Agent 配置里，同样列入命名约定的不可改名表。`api_version`、IPC 主版本与 Markdown 格式能力版本独立；主版本不匹配拒绝连接，增加可选字段应保持兼容。
 
 现有 `settings.json`、`state.json`、bundle identifier、support 目录、笔记文件格式与主题接口不改名。若新增设置字段，用缺省解码兼容旧文件并更新快照；接入状态与日志放专门文件，不借用 `plumes`。首版不改编辑器，也不新增桥接方法；后续加入编辑器事务时，新增桥接方法需同时更新 TypeScript、Swift command/message 和契约测试，保留现有方法名。
 

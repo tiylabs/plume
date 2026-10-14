@@ -3,14 +3,14 @@ import PlumeKit
 
 /// The helper's command line: `mcp`, and the CLI that does the same work for agents with a shell.
 ///
-///     plume-agent mcp
-///     plume-agent context [--target REF] [--template ID] [--example REF]…
-///     plume-agent notes list [--cursor C] [--limit N]
-///     plume-agent notes search --query Q [--cursor C] [--limit N]
-///     plume-agent notes read --ref REF [--download]
-///     plume-agent notes create [--input FILE] --request-id UUID
-///     plume-agent notes modify [--input FILE]
-///     plume-agent operations get --request-id UUID
+///     plume-cli mcp
+///     plume-cli context [--target REF] [--template ID] [--example REF]…
+///     plume-cli notes list [--cursor C] [--limit N]
+///     plume-cli notes search --query Q [--cursor C] [--limit N]
+///     plume-cli notes read --ref REF [--download]
+///     plume-cli notes create [--input FILE] --request-id UUID
+///     plume-cli notes modify [--input FILE]
+///     plume-cli operations get --request-id UUID
 ///
 /// Output is the same JSON the MCP tools return — pretty by default, compact with `--json` — on
 /// stdout; diagnostics go to stderr. Exit 0 on success, 1 on a failure from Plume (the JSON is then
@@ -29,14 +29,14 @@ public enum HelperCommand: Equatable {
     }
 
     public static let usage = """
-    usage: plume-agent mcp
-           plume-agent context [--target REF] [--template ID] [--example REF]... [--json]
-           plume-agent notes list [--cursor CURSOR] [--limit N] [--json]
-           plume-agent notes search --query TEXT [--cursor CURSOR] [--limit N] [--json]
-           plume-agent notes read --ref REF [--download] [--json]
-           plume-agent notes create [--input FILE|-] --request-id UUID [--json]
-           plume-agent notes modify [--input FILE|-] [--json]
-           plume-agent operations get --request-id UUID [--json]
+    usage: plume-cli mcp
+           plume-cli context [--target REF] [--template ID] [--example REF]... [--json]
+           plume-cli notes list [--cursor CURSOR] [--limit N] [--json]
+           plume-cli notes search --query TEXT [--cursor CURSOR] [--limit N] [--json]
+           plume-cli notes read --ref REF [--download] [--json]
+           plume-cli notes create [--input FILE|-] --request-id UUID [--json]
+           plume-cli notes modify [--input FILE|-] [--json]
+           plume-cli operations get --request-id UUID [--json]
 
     The credential is read from \(AgentAPI.tokenEnvironmentKey). Note text and modify requests are read
     from --input or, when it is omitted or '-', from stdin.

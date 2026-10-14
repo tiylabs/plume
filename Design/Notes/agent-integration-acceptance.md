@@ -50,18 +50,18 @@
 
 已完成（本机，2026-10-14）：
 - `PLUME_SIGN_IDENTITY='Developer ID Application: BINBIN ZHU (3Y76W6673W)' Scripts/build-app.sh --universal` 通过。
-- `plume-agent`：`x86_64 arm64`，`Identifier=com.tiylabs.plume.agent`，`flags=0x10000(runtime)`，带 secure timestamp，TeamIdentifier `3Y76W6673W`；App 本体同样启用 hardened runtime。
-- `codesign --verify --deep --strict build/Plume.app` 通过；`plume-agent --version` 正常输出。
+- `plume-cli`：`x86_64 arm64`，`Identifier=com.tiylabs.plume.cli`，`flags=0x10000(runtime)`，带 secure timestamp，TeamIdentifier `3Y76W6673W`；App 本体同样启用 hardened runtime。
+- `codesign --verify --deep --strict build/Plume.app` 通过；`plume-cli --version` 正常输出。
 - `spctl --assess` 返回 `rejected (Unnotarized Developer ID)`，符合预期：本机没有 notarytool 凭据，公证按约定交给 release workflow。
 
 剩余：
 1. 由 release workflow 执行公证（`Scripts/notarize.sh`），确认 `xcrun stapler validate` 与 `spctl --assess --type execute` 通过。
-2. 在一台干净的 Mac 上安装 DMG，通过 helper 路径运行 `plume-agent --version`，确认 Gatekeeper 不拦截。
+2. 在一台干净的 Mac 上安装 DMG，通过 helper 路径运行 `plume-cli --version`，确认 Gatekeeper 不拦截。
 
 **M2 · 真实 iCloud 驱逐**（剩余，需要能访问 iCloud Drive 的终端）
 1. Dev 包的 Vault 设为 `~/Library/Mobile Documents/com~apple~CloudDocs/Plume-dev`，写入一篇含关键字的笔记。
 2. Finder 中对该文件选“移除下载项”，或执行 `brctl evict <文件>`。
-3. `plume-agent notes list`：该笔记的 `availability` 为 `evicted`；`notes search --query <关键字>`：只能按标题找到，`bodies_not_searched ≥ 1`。
+3. `plume-cli notes list`：该笔记的 `availability` 为 `evicted`；`notes search --query <关键字>`：只能按标题找到，`bodies_not_searched ≥ 1`。
 4. `notes read --ref …`：返回 `NOTE_NOT_AVAILABLE`；加 `--download` 后返回正文，期间 Panel 的保存不受影响。
 
 **M3 · 第三方 Agent 客户端**（剩余，本机未安装客户端）
@@ -74,7 +74,7 @@
 
 已完成：生命周期 smoke A（见第 1 节第 21 行）。
 
-剩余：在弹出的 chooser 中实际选择一个文件夹，再执行 `plume-agent notes list`，应正常返回。选择文件夹需要操作系统的打开面板，脚本无法代替。
+剩余：在弹出的 chooser 中实际选择一个文件夹，再执行 `plume-cli notes list`，应正常返回。选择文件夹需要操作系统的打开面板，脚本无法代替。
 
 **M5 · 写入进行中的 AppKit 流程**
 

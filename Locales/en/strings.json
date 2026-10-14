@@ -378,7 +378,7 @@
   "agent.mcp": "MCP configuration",
   "agent.mcp.explanation": "For agents that start local MCP servers. Includes your credential.",
   "agent.cli": "Command-line helper",
-  "agent.cli.explanation": "For agents that run shell commands. Set PLUME_AGENT_TOKEN to the credential.",
+  "agent.cli.explanation": "For agents that run shell commands. Set PLUME_CLI_TOKEN to the credential.",
   "agent.credential": "Credential",
   "agent.credential.explanation": "Revoking stops every configured agent until you copy the configuration again.",
   "agent.copy": "Copy",
