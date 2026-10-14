@@ -22,6 +22,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let storage: StorageSettingsViewController
     private let appearance: AppearanceSettingsViewController
     private let shortcuts: ShortcutsSettingsViewController
+    private let agent: AgentSettingsViewController
     private let about: AboutSettingsViewController
 
     /// The height every tab fits in, before the Storage tab asks for more (Git's rows).
@@ -29,7 +30,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     init(
         settings: SettingsStore,
-        onWillMoveNotes: @escaping () -> Void,
+        agentAccess: AgentAccessCoordinator,
+        onShowNote: @escaping (String) -> Void,
+        onWillMoveNotes: @escaping () async -> Void,
+        onDidMoveNotes: @escaping () -> Void,
         onUpdateStatus: @escaping (ReleaseCheck.Status) -> Void,
         onSyncNow: @escaping () -> Void,
         onVaultChanged: @escaping (URL) -> Void
@@ -39,20 +43,24 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         storage = StorageSettingsViewController(settings: settings)
         appearance = AppearanceSettingsViewController(settings: settings)
         shortcuts = ShortcutsSettingsViewController(settings: settings)
+        agent = AgentSettingsViewController(agent: agentAccess)
+        agent.onShowNote = onShowNote
         about = AboutSettingsViewController()
         storage.onWillMoveNotes = onWillMoveNotes
+        storage.onDidMoveNotes = onDidMoveNotes
         storage.onVaultChanged = onVaultChanged
         storage.onSyncNow = onSyncNow
         about.onStatus = onUpdateStatus
 
         let tabs = NSTabViewController()
         tabs.tabStyle = .toolbar
-        for controller in [general, storage, appearance, shortcuts, about] as [NSViewController] {
+        for controller in [general, storage, appearance, shortcuts, agent, about] as [NSViewController] {
             tabs.addTabViewItem(NSTabViewItem(viewController: controller))
         }
         // SF Symbols matching the frame's own glyphs: gear, folder, half-filled circle, keyboard.
         // About is the one tab the frames do not draw, and takes the system's own about glyph.
-        let symbols = ["gearshape", "folder", "circle.lefthalf.filled", "keyboard", "info.circle"]
+        // The Agent tab takes the system's "connected" glyph: it is about another program joining in.
+        let symbols = ["gearshape", "folder", "circle.lefthalf.filled", "keyboard", "point.3.connected.trianglepath.dotted", "info.circle"]
         for (item, symbol) in zip(tabs.tabViewItems, symbols) {
             item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: item.label)
         }
@@ -76,7 +84,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let sized = [general, storage, appearance, about] as [NSViewController]
         let height = sized.map(\.view.fittingSize.height).max() ?? PanelWindow.defaultHeight
         let size = NSSize(width: SettingsForm.contentWidth, height: height)
-        for controller in [general, storage, appearance, shortcuts, about] as [NSViewController] {
+        for controller in [general, storage, appearance, shortcuts, agent, about] as [NSViewController] {
             controller.preferredContentSize = size
         }
 
@@ -131,7 +139,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         guard let window, baseHeight > 0 else { return }
         let target = max(baseHeight, needed.rounded(.up))
         let size = NSSize(width: SettingsForm.contentWidth, height: target)
-        for controller in [general, storage, appearance, shortcuts, about] as [NSViewController] {
+        for controller in [general, storage, appearance, shortcuts, agent, about] as [NSViewController] {
             controller.preferredContentSize = size
         }
         let wanted = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
@@ -148,6 +156,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Opens on the Storage tab — where a sync failure is explained.
+    /// The agent journal or access switch changed.
+    func agentChanged() {
+        agent.refresh()
+    }
+
     func showStorage() {
         (contentViewController as? NSTabViewController)?.selectedTabViewItemIndex = 1
     }

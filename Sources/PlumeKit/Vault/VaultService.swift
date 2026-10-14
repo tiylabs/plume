@@ -10,7 +10,7 @@ import Foundation
 /// `NoteIndex` is owned here and touched only from `queue`.
 public final class VaultService: @unchecked Sendable, VaultServicing {
 
-    private let queue = DispatchQueue(label: "com.tiylabs.plume.vault", qos: .userInitiated)
+    let queue = DispatchQueue(label: "com.tiylabs.plume.vault", qos: .userInitiated)
 
     /// Waiting for iCloud happens here rather than on `queue`.
     ///
@@ -23,12 +23,12 @@ public final class VaultService: @unchecked Sendable, VaultServicing {
     /// The ordering argument for the serial queue is about work that *touches* the vault — a write,
     /// the FSEvents reaction to it, the index refresh behind it. A wait touches nothing, so it does
     /// not belong in that line. The `load` that follows the wait still does.
-    private let downloads = DispatchQueue(label: "com.tiylabs.plume.vault.download", qos: .utility)
+    let downloads = DispatchQueue(label: "com.tiylabs.plume.vault.download", qos: .utility)
 
-    private let index = NoteIndex()
+    let index = NoteIndex()
 
     /// Only read or written on `queue`.
-    private var vaultURL: URL
+    var vaultURL: URL
 
     /// `deletedStore` is where Recently Deleted lives; nil means the standard folder under
     /// Application Support. A test passes a temporary folder so it never touches the real one.
@@ -43,6 +43,10 @@ public final class VaultService: @unchecked Sendable, VaultServicing {
     /// write is still in flight when the next operation is enqueued, which is the only way to tell
     /// "ran after it because the queue is serial" from "ran after it by luck".
     public var writeDelayForTesting: TimeInterval = 0
+
+    /// Held by agent API writes against Git's merge (see `VaultWriteGate`). A test supplies its own.
+    public var writeGate = VaultWriteGate.shared
+    public var writeGateTimeout = AgentLimits.worktreeGateTimeout
 
     public func setVault(_ url: URL) {
         queue.async { self.vaultURL = url }

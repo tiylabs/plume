@@ -80,9 +80,9 @@ public enum VaultIO {
 
     /// `sys/resource.h`. Not surfaced as Swift constants, so they are spelled out — and the values
     /// were confirmed against the SDK header rather than guessed, because guessing produced `EINVAL`.
-    private static let ioPolicyTypeMaterializeDatalessFiles: Int32 = 3  // IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES
-    private static let ioPolicyScopeThread: Int32 = 1                   // IOPOL_SCOPE_THREAD
-    private static let ioPolicyMaterializeOff: Int32 = 1                // IOPOL_MATERIALIZE_DATALESS_FILES_OFF
+    static let ioPolicyTypeMaterializeDatalessFiles: Int32 = 3  // IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES
+    static let ioPolicyScopeThread: Int32 = 1                   // IOPOL_SCOPE_THREAD
+    static let ioPolicyMaterializeOff: Int32 = 1                // IOPOL_MATERIALIZE_DATALESS_FILES_OFF
 
     /// Reads a file, failing immediately rather than blocking if it turns out to be evicted.
     ///

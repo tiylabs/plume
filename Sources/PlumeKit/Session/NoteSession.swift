@@ -58,7 +58,7 @@ public final class NoteSession {
     }
 
     var writeTimer: (any Cancellable)?
-    private var isWriting = false
+    var isWriting = false
     var writeRequestedWhileWriting = false
 
     /// A note that has been asked for but not yet written — no file, no name, no state entry.
@@ -532,8 +532,8 @@ public final class NoteSession {
                 // The panel may have moved on while the move was on the queue.
                 guard self.currentFilename == filename else { return }
                 self.repoint(from: filename, to: newName)
-                // Still unsettled: the title can go on changing, and so can the name.
-                self.unsettledName = newName
+                // Still unsettled — unless something settled it while the move was on the queue.
+                if self.unsettledName == filename { self.unsettledName = newName }
             }
         }
     }
