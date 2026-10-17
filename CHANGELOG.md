@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > are recorded in its history, not in this file. The entries below cover this fork only. The project was renamed from Pane to Plume after v0.3.1075;
 > the older entries and their links still use the former name and repository path `tiylabs/pane`.
 
+## [v0.6.0] - 2026-10-13
+### :bug: Bug Fixes
+- [`99fd7af`](https://github.com/tiylabs/plume/commit/99fd7afef146c76f604e8726a8929226f45463c8) - **panel**: 🐛 Stop a new draft from adopting the previous draft's file *(PR [#9](https://github.com/tiylabs/plume/pull/9) by [@jorben](https://github.com/jorben))*
+
+### :recycle: Refactors
+- [`e4475bd`](https://github.com/tiylabs/plume/commit/e4475bd0f6a984a4c9816af23cd9cdca03d84b3e) - **architecture**: ♻️ Restructure layout, boundaries and big types *(PR [#7](https://github.com/tiylabs/plume/pull/7) by [@jorben](https://github.com/jorben))*
+
+
 ## [v0.5.0] - 2026-10-13
 ### :boom: BREAKING CHANGES
 - due to [`2a1c8ff`](https://github.com/tiylabs/plume/commit/2a1c8ffda76a7e3d218294b061f578b135ad03ef) - ✨ Add three-way desktop assignment to ⌘K *(PR [#6](https://github.com/tiylabs/plume/pull/6) by [@jorben](https://github.com/jorben))*:
@@ -57,3 +65,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.3.1075]: https://github.com/tiylabs/pane/compare/v0.2.1075...v0.3.1075
 [v0.4.1075]: https://github.com/tiylabs/plume/compare/v0.3.1075...v0.4.1075
 [v0.5.0]: https://github.com/tiylabs/plume/compare/v0.4.1075...v0.5.0
+[v0.6.0]: https://github.com/tiylabs/plume/compare/v0.5.0...v0.6.0

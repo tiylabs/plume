@@ -1,7 +1,8 @@
 name: CI
 
-# CI runs on every branch push and pull request so topic branches are checked before they are
-# merged into `master`. See "Branching and commits" in AGENTS.md.
+# Every branch, and pull requests. Work happens on topic branches and reaches `master` through a
+# pull request, so a trigger on `master` alone would gate nothing — a topic branch has to be green
+# before it is merged. See "Branching and commits" in AGENTS.md.
 on:
   push:
     branches:
