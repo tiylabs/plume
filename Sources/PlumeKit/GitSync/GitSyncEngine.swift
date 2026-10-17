@@ -43,13 +43,20 @@ public final class GitSyncEngine: @unchecked Sendable {
 
     private var resolvedBranch: String?
 
+    /// Held around every step that writes the working tree or reads it into a commit — finishing a
+    /// merge, committing, merging — so an agent API write cannot land in the middle of one. Fetch and
+    /// push run outside it. See `VaultWriteGate`.
+    private let gate: VaultWriteGate
+
     public init(
         vault: URL,
         remoteURL: String,
         branch: String = "",
         runner: GitRunner = GitRunner(),
+        gate: VaultWriteGate = .shared,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
+        self.gate = gate
         self.vault = vault
         self.remoteURL = remoteURL.trimmingCharacters(in: .whitespacesAndNewlines)
         self.configuredBranch = branch.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -152,7 +159,7 @@ public final class GitSyncEngine: @unchecked Sendable {
         var activity = Activity()
 
         // 1. A merge left open by an earlier cycle, or by the person resolving it.
-        switch finishMergeIfResolved() {
+        switch gate.withGate({ finishMergeIfResolved() }) {
         case .done: break
         case .conflicts(let files): return .conflicts(files)
         case .failed(let failure): return .failed(failure)
@@ -167,14 +174,14 @@ public final class GitSyncEngine: @unchecked Sendable {
 
         // 3. What is here — committed first, so the merge below is between two commits and a clash
         //    shows up as markers instead of git refusing to start.
-        switch commitLocalChanges() {
+        switch gate.withGate({ commitLocalChanges() }) {
         case .success(let committed): activity.committed = committed
         case .failure(let failure): return .failed(failure)
         }
 
         // 4 and 5, retried once if somebody pushed between our fetch and our push.
         for attempt in 0..<2 {
-            switch integrateRemote(branch: branch, activity: &activity) {
+            switch gate.withGate({ integrateRemote(branch: branch, activity: &activity) }) {
             case .done: break
             case .conflicts(let files): return .conflicts(files)
             case .failed(let failure): return .failed(failure)
@@ -199,7 +206,7 @@ public final class GitSyncEngine: @unchecked Sendable {
     /// Resolves what can be resolved without the network, for the moment after somebody edited a
     /// conflicted note. Cheap enough to run on every change while conflicts stand.
     public func recheckConflicts() -> Outcome {
-        switch finishMergeIfResolved() {
+        switch gate.withGate({ finishMergeIfResolved() }) {
         case .done: return .synced(Activity())
         case .conflicts(let files): return .conflicts(files)
         case .failed(let failure): return .failed(failure)
@@ -213,7 +220,7 @@ public final class GitSyncEngine: @unchecked Sendable {
         guard runner.isAvailable, isRepository, !isMergeInProgress, conflictedFiles().isEmpty else {
             return false
         }
-        if case .success(let committed) = commitLocalChanges() { return committed }
+        if case .success(let committed) = gate.withGate({ commitLocalChanges() }) { return committed }
         return false
     }
 

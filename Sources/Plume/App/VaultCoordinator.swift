@@ -29,6 +29,10 @@ final class VaultCoordinator {
     var onNotesChanged: ([String]) -> Void = { _ in }
     /// Pruning finished: the menu bar's titles may be stale.
     var onPruned: () -> Void = {}
+    /// The chooser is about to run its modal loop, and when a folder has been chosen. The agent socket
+    /// answers from other threads while the main thread sits in that loop, so it is told directly.
+    var onChooserPresented: () -> Void = {}
+    var onChooserResolved: () -> Void = {}
 
     private var watcher: VaultWatcher?
 
@@ -96,6 +100,7 @@ final class VaultCoordinator {
     /// activate, the user is at their least patient, and a familiar system dialog says "your files
     /// are a filesystem problem, and you are in charge of it" better than bespoke chrome would.
     private func presentChooser(message: String, detail: String) {
+        onChooserPresented()
         NSApp.activate(ignoringOtherApps: true)
 
         let alert = NSAlert()
@@ -125,6 +130,7 @@ final class VaultCoordinator {
 
         settings.update { $0.vaultPath = chosen.path }
         state.update { $0.vaultEverCreated = true }
+        onChooserResolved()
 
         if let vault, let panel {
             vault.setVault(chosen)

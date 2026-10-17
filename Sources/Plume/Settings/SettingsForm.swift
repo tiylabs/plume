@@ -157,6 +157,55 @@ final class SettingsForm {
         return container
     }
 
+    /// A vertical scroll view for the tabs that can outgrow the shared window height (Shortcuts
+    /// always, MCP once its recent writes fill up). Put a page in it with `embed(in:)`.
+    static func scrollView() -> NSScrollView {
+        let scroll = NSScrollView()
+        // AppKit uses the scroll view's background for the toolbar's scroll-edge appearance; the
+        // window background matches the tabs that do not scroll.
+        scroll.drawsBackground = true
+        scroll.backgroundColor = .windowBackgroundColor
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.horizontalScrollElasticity = .none
+        return scroll
+    }
+
+    /// Makes this page the scroll view's document, replacing whatever was there.
+    ///
+    /// The page sits in a flipped view. `NSClipView` puts a document view that is *shorter* than
+    /// itself at the bottom of an unflipped coordinate space, so a short page — the MCP tab with access
+    /// off is two rows and a footnote — was drawn against the window's bottom edge with the space
+    /// above it empty. Shortcuts never showed it because it is always taller than the window. The
+    /// flipped view is at least as tall as the visible area and keeps the page at its top, whatever
+    /// the page's height.
+    func embed(in scroll: NSScrollView) {
+        let page = makeContentView()
+        let document = TopAlignedView()
+        document.translatesAutoresizingMaskIntoConstraints = false
+        page.translatesAutoresizingMaskIntoConstraints = false
+        document.addSubview(page)
+        scroll.documentView = document
+
+        let clip = scroll.contentView
+        NSLayoutConstraint.activate([
+            page.topAnchor.constraint(equalTo: document.topAnchor),
+            page.leadingAnchor.constraint(equalTo: document.leadingAnchor),
+            page.trailingAnchor.constraint(equalTo: document.trailingAnchor),
+            document.topAnchor.constraint(equalTo: clip.topAnchor),
+            document.leadingAnchor.constraint(equalTo: clip.leadingAnchor),
+            document.widthAnchor.constraint(equalTo: clip.widthAnchor),
+            // At least the visible height, so a short page stays at the top; at least the page's
+            // height, so a long one scrolls.
+            document.heightAnchor.constraint(greaterThanOrEqualTo: clip.heightAnchor),
+            document.bottomAnchor.constraint(greaterThanOrEqualTo: page.bottomAnchor),
+        ])
+        // And no taller than the larger of the two.
+        let hug = document.heightAnchor.constraint(equalToConstant: 0)
+        hug.priority = .defaultLow
+        hug.isActive = true
+    }
+
     // MARK: - Controls
 
     static func toggle(_ isOn: Bool, target: AnyObject, action: Selector) -> NSSwitch {
@@ -213,4 +262,10 @@ final class SettingsForm {
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return field
     }
+}
+
+/// A document view whose origin is its top-left, so a page shorter than the scroll view stays at the
+/// top instead of falling to the bottom.
+private final class TopAlignedView: NSView {
+    override var isFlipped: Bool { true }
 }

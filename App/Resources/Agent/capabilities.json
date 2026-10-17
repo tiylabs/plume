@@ -1,0 +1,22 @@
+{
+  "format_version": 1,
+  "encoding": "utf-8",
+  "line_endings": "lf",
+  "title": "first non-blank line",
+  "front_matter": false,
+  "renders": {
+    "headings": "# to ###### followed by a space",
+    "emphasis": ["**bold**", "*italic*", "~~strikethrough~~", "`code`"],
+    "links": "[text](url)",
+    "highlight": "==text==",
+    "underline": "<u>text</u>",
+    "bullet_list": "- item",
+    "ordered_list": "1. item",
+    "task_list": "- [ ] item / - [x] item (bullets only)",
+    "blockquote": "> text (paragraphs, lists and nested quotes only)",
+    "fenced_code": "```",
+    "horizontal_rule": "--- (not on the first line)"
+  },
+  "list_items_hold": "text only: no second marker on the same line, nested lists on their own indented line",
+  "kept_as_text": ["tables", "images", "mermaid", "math", "footnotes", "wiki links", "yaml front matter"]
+}

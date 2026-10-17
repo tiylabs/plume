@@ -43,6 +43,7 @@ SUITES=(
 	"narrow|narrow.test.js|380"
 	"tooltip|tooltip.test.js|"
 	"i18n|i18n.test.js|"
+	"agent|agent.test.js|"
 )
 
 skip_editor=0
