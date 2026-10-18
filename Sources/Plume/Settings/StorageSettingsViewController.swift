@@ -27,7 +27,8 @@ final class StorageSettingsViewController: NSViewController {
 
     /// Called immediately before *Move Notes* touches a file, so the buffer can be written while it
     /// still knows where it lives. See `adopt`.
-    var onWillMoveNotes: (() -> Void)?
+    var onWillMoveNotes: (() async -> Void)?
+    var onDidMoveNotes: (() -> Void)?
 
     /// Called for *Sync Now*.
     var onSyncNow: (() -> Void)?
@@ -484,6 +485,11 @@ final class StorageSettingsViewController: NSViewController {
     // MARK: - Moving
 
     private func adopt(_ destination: URL, movingNotes: Bool) {
+        Task { @MainActor in await performAdopt(destination, movingNotes: movingNotes) }
+    }
+
+    private func performAdopt(_ destination: URL, movingNotes: Bool) async {
+        defer { if movingNotes { onDidMoveNotes?() } }
         do {
             try FileManager.default.createDirectory(
                 at: destination, withIntermediateDirectories: true
@@ -502,7 +508,7 @@ final class StorageSettingsViewController: NSViewController {
                 // below is `FileManager` on this thread, so the move overtook the write it was
                 // meant to wait for and the fault above happened anyway. `onWillMoveNotes` drains
                 // the queue as well as flushing it, which is what makes "first" true.
-                onWillMoveNotes?()
+                await onWillMoveNotes?()
                 try moveNotes(from: settings.value.vaultURL, to: destination)
             }
         } catch {

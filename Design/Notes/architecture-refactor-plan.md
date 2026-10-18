@@ -65,7 +65,7 @@
 4. **小步可回滚**：每个 PR 单一意图，可以独立 `git revert`；单个 PR diff 控制在约 800 行以内，纯 `git mv` 不计。
 5. **先引入接缝，再搬迁，最后补测试**：对于无法先写测试的 AppKit 代码，先在原地引入抽象（输出协议、调度器），保持行为不变；再整体搬到 PlumeKit；然后补单测。搬迁 PR 依靠 smoke t1 和手工清单兜底。
 6. **兼容面冻结**：第 2 节列出的对外接口，本方案中一律不改名；确实要改，必须走"迁移 + 快照更新 + CHANGELOG"流程。
-7. **提交规范**：沿用 `Scripts/check-commit-msg.sh` 的约定式提交，例如 `refactor(kit): ♻️ Group PlumeKit sources by domain`。PR 目标分支为 `dev`。
+7. **提交规范**：沿用 `Scripts/check-commit-msg.sh` 的约定式提交，例如 `refactor(kit): ♻️ Group PlumeKit sources by domain`。PR 目标分支为 `master`。
 8. **注释自洽**：注释只写仓库里能看到的理由，不引用 `decision N`、`frame Xy`、`LAB.md` 这类外部编号或文件（附录 A.8）。搬迁代码时先原样搬，再用单独的提交改写搬过去的注释，这样不违反原则 2。
 
 ---
@@ -188,7 +188,7 @@
   - 统计范围：`git ls-files` 列出的全部文本文件，排除 `.gitignore`。`.gitignore` 里的那条注释是在解释这些文档为什么只留在本地，属于合理提及。
   - 基线写在 `Scripts/doc-refs.baseline` 里，只有一个数字，初始值为 **760**（2026-10-13 在 `2a1c8ff` 上实测）。
   - 判定方式为严格棘轮：
-    - 实际数 > 基线：失败，列出 `git diff origin/dev...HEAD` 中新增的命中行；
+    - 实际数 > 基线：失败，列出 `git diff origin/master...HEAD` 中新增的命中行；
     - 实际数 < 基线：也失败，提示"请把基线下调到 N"，让每次减少都被固化下来；
     - 相等：通过。
   - 接入 `make lint` 和 CI 的 macOS job。

@@ -20,6 +20,8 @@ final class AppCoordinator {
     private var menuBar: MenuBarController!
     private var hotkey: GlobalHotkey!
     private let gitSync = GitSyncController()
+    /// The local agent API (Settings → MCP). Started before the vault is resolved.
+    let agentAccess = AgentAccessCoordinator()
     private var settingsWindow: SettingsWindowController?
 
     private lazy var vaultCoordinator = VaultCoordinator(settings: settings, state: state)
@@ -50,7 +52,16 @@ final class AppCoordinator {
 
         // Decision 13, and the order matters: the vault has to be resolved before anything tries to
         // read a note out of it, and "create it" is only ever allowed to happen once.
+        // Before the vault: a helper that launched Plume hears "choose a folder" while the chooser
+        // is up, instead of timing out against a socket that does not exist yet.
+        agentAccess.start()
+
         vaultCoordinator.resumeLaunch = { [weak self] in self?.start() }
+        // prepare() may run the chooser's modal loop before it returns; the socket threads are told
+        // from inside it, and only then — a vault that is fine must read as "starting", which a
+        // helper retries, not as "unavailable", which it does not.
+        vaultCoordinator.onChooserPresented = { [weak self] in self?.agentAccess.vaultUnavailable() }
+        vaultCoordinator.onChooserResolved = { [weak self] in self?.agentAccess.vaultChosen() }
         guard vaultCoordinator.prepare() else { return }
 
         vault = VaultService(vault: settings.value.vaultURL)
@@ -64,6 +75,17 @@ final class AppCoordinator {
             settings: settings, state: state, panel: panelController, menuBar: { [weak self] in self?.menuBar }
         )
         wireVaultCoordinator()
+        agentAccess.onChange = { [weak self] in self?.settingsWindow?.agentChanged() }
+        agentAccess.attach(
+            vault: vault, vaultURL: settings.value.vaultURL, session: panelController.session,
+            // Summoned *and* key: the parked panel stays offscreen with its web view running and can
+            // still report key status (measured on a background launch by the helper), but nobody
+            // can type into a panel they cannot see.
+            panelHasKeyboard: { [weak self] in
+                guard let panel = self?.panelController else { return false }
+                return panel.isVisible && panel.panel.isKeyWindow
+            }
+        )
 
         installMenuBarItem()
         installHotkey()
@@ -148,9 +170,20 @@ final class AppCoordinator {
             // when the vault path changes is written against the *new* folder under the old note's
             // name, or not at all. Safe rather than a race for the same reason: vault I/O is one
             // serial queue, so this write runs with the old location before `setVault` changes it.
+            if agentAccess.handler?.hasPendingWrites == true {
+                agentAccess.handler?.writesSuspended = true
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    await agentAccess.handler?.waitForWrites()
+                    settingsChanged(settings.value)
+                    agentAccess.handler?.writesSuspended = false
+                }
+                return
+            }
             panelController?.flush(trigger: .noteSwitched)
             currentVaultURL = new.vaultURL
             vault?.setVault(new.vaultURL)
+            agentAccess.vaultChanged(new.vaultURL)
             vaultCoordinator.startWatching()
             panelController?.openLastUsedNote()
         }
@@ -196,6 +229,11 @@ final class AppCoordinator {
         if settingsWindow == nil {
             settingsWindow = SettingsWindowController(
                 settings: settings,
+                agentAccess: agentAccess,
+                onShowNote: { [weak self] filename in
+                    self?.panelController.summon()
+                    self?.panelController.open(filename)
+                },
                 // Before *Move Notes* moves anything, so what is on screen is written while the
                 // buffer still points at a file that exists (decision 73).
                 //
@@ -209,9 +247,12 @@ final class AppCoordinator {
                 // recreates it, and the old folder is left holding the newest text while the moved
                 // copy is stale and the panel reloads showing the stale one.
                 onWillMoveNotes: { [weak self] in
+                    self?.agentAccess.suspendWritesForMove()
+                    await self?.agentAccess.handler?.waitForWrites()
                     self?.panelController.flush(trigger: .noteSwitched)
                     self?.vault.drain()
                 },
+                onDidMoveNotes: { [weak self] in self?.agentAccess.resumeWritesAfterMove() },
                 onUpdateStatus: { [weak self] in self?.updates.record($0) },
                 onSyncNow: { [weak self] in self?.gitSync.syncNow() }
             ) { [weak self] url in
@@ -219,8 +260,9 @@ final class AppCoordinator {
                 // Same as the hand-edited path above, and this is the one people actually use: the
                 // Sync radio and "Notes folder" both land here, and *Move Notes* (decision 30) moves
                 // the file the buffer is pointing at.
-                self.panelController.flush(trigger: .noteSwitched)
-                self.vault.setVault(url)
+                // settingsChanged has already repointed the service, possibly after pending writes
+                // finished. Repointing here again could bypass that asynchronous barrier.
+                self.agentAccess.vaultChanged(url)
                 self.vaultCoordinator.startWatching()
                 self.panelController.openLastUsedNote()
                 self.refreshMenuBar()
@@ -247,6 +289,7 @@ final class AppCoordinator {
     }
 
     func willTerminate() {
+        agentAccess.stop()
         panelController?.stopDockSpaceDetection()
         // Decision 10's third immediate flush. Everything else is recoverable; unsaved text is not.
         panelController?.flush(trigger: .quitting)

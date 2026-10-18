@@ -14,6 +14,8 @@
 #   Scripts/build-app.sh --universal     arm64 + x86_64, for a release artifact
 #   Scripts/build-app.sh --skip-editor   reuse the existing Editor/dist
 #   Scripts/build-app.sh --binary PATH   assemble and sign a prebuilt binary, skipping Swift build
+#   Scripts/build-app.sh --helper PATH   use a prebuilt plume-cli (default with --binary: the file
+#                                        named plume-cli beside the binary)
 #
 #   PLUME_SIGN_IDENTITY="Developer ID Application: ..." Scripts/build-app.sh --universal
 #                                        hardened-runtime Developer ID signature, for release
@@ -27,6 +29,7 @@ CONFIG=release
 CHANNEL=release
 SKIP_EDITOR=0
 PREBUILT_BIN=
+PREBUILT_HELPER=
 ARCH_ARGS=()
 
 while [[ $# -gt 0 ]]; do
@@ -44,7 +47,15 @@ while [[ $# -gt 0 ]]; do
 			PREBUILT_BIN="$2"
 			shift
 			;;
-		-h|--help)     sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+		--helper)
+			if [[ -z "${2:-}" || "$2" == --* ]]; then
+				echo "error: --helper requires a path" >&2
+				exit 2
+			fi
+			PREBUILT_HELPER="$2"
+			shift
+			;;
+		-h|--help)     sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
 		*)             echo "unknown flag: $1" >&2; exit 2 ;;
 	esac
 	shift
@@ -95,6 +106,21 @@ else
 fi
 [[ -f "$BIN" ]] || { echo "error: binary not found at $BIN" >&2; exit 1; }
 
+# The agent helper (plume-cli), which agents start from Contents/MacOS. Always universal, even in a
+# host-only build: it is the path written into people's agent configurations, it is small, and a
+# bundle whose helper is missing a slice fails only on the other kind of Mac — exactly where nobody
+# building this would notice.
+if [[ -n "$PREBUILT_HELPER" ]]; then
+	HELPER="$PREBUILT_HELPER"
+elif [[ -n "$PREBUILT_BIN" ]]; then
+	HELPER="$(dirname "$PREBUILT_BIN")/plume-cli"
+else
+	say "Building plume-cli ($CONFIG, universal)"
+	swift build -c "$CONFIG" --arch arm64 --arch x86_64 --product plume-cli
+	HELPER="$(swift build -c "$CONFIG" --arch arm64 --arch x86_64 --product plume-cli --show-bin-path)/plume-cli"
+fi
+[[ -f "$HELPER" ]] || { echo "error: plume-cli not found at $HELPER" >&2; exit 1; }
+
 # ---- 3. bundle layout -------------------------------------------------------------------------
 say "Assembling $APP"
 rm -rf "$APP"
@@ -103,6 +129,8 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 cp "$BIN" "$CONTENTS/MacOS/Plume"
 # GitHub artifact downloads reset file modes, including the executable bit.
 chmod +x "$CONTENTS/MacOS/Plume"
+cp "$HELPER" "$CONTENTS/MacOS/plume-cli"
+chmod +x "$CONTENTS/MacOS/plume-cli"
 cp -R "$ROOT/Editor/dist/." "$CONTENTS/Resources/Editor/"
 
 # Static bundle resources — currently the menu bar template images. Flat rather than in a
@@ -176,16 +204,22 @@ fi
 #   unset — ad-hoc. Local and CI builds. An arm64 Mach-O with no signature at all will not launch, so
 #           this is not optional, but it carries no identity and Gatekeeper will not accept it.
 #   set   — Developer ID with the hardened runtime and a secure timestamp, which is what notarization
-#           requires. No --deep: the bundle holds exactly one executable and no nested code, and
-#           Apple deprecates --deep for signing. No entitlements file either — WKWebView, Carbon
-#           hotkeys and SMAppService need none under the hardened runtime.
+#           requires. No --deep: Apple deprecates it for signing. The bundle holds two executables,
+#           so they are signed inside-out by hand — the helper first, then the app, whose signature
+#           seals the helper's. No entitlements file either — WKWebView, Carbon hotkeys,
+#           SMAppService, a Unix socket and launching `open` need none under the hardened runtime.
+HELPER_ID="$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$CONTENTS/Info.plist").cli"
 if [[ -n "${PLUME_SIGN_IDENTITY:-}" ]]; then
 	say "Signing with Developer ID: $PLUME_SIGN_IDENTITY"
+	codesign --force --options runtime --timestamp --identifier "$HELPER_ID" \
+		--sign "$PLUME_SIGN_IDENTITY" "$CONTENTS/MacOS/plume-cli"
 	codesign --force --options runtime --timestamp --sign "$PLUME_SIGN_IDENTITY" "$APP"
 else
 	say "Ad-hoc signing"
+	codesign --force --identifier "$HELPER_ID" --sign - --timestamp=none "$CONTENTS/MacOS/plume-cli"
 	codesign --force --sign - --timestamp=none "$APP"
 fi
+codesign --verify --strict "$CONTENTS/MacOS/plume-cli"
 codesign --verify --deep --strict "$APP"
 
 say "Built $APP ($VERSION build $BUILD_NUMBER)"

@@ -15,6 +15,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.start()
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard coordinator.agentAccess.handler?.hasPendingWrites == true else { return .terminateNow }
+        coordinator.agentAccess.handler?.writesSuspended = true
+        Task { @MainActor in
+            await coordinator.agentAccess.handler?.waitForWrites()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         coordinator.willTerminate()
     }

@@ -58,8 +58,12 @@ public final class NoteSession {
     }
 
     var writeTimer: (any Cancellable)?
-    private var isWriting = false
+    var isWriting = false
     var writeRequestedWhileWriting = false
+    /// Set while an agent write holds the gate (`NoteSession+Agent.swift`), with the save of this
+    /// note's typing that the gate deferred, if the buffer had to be replaced before it could run.
+    var agentWriteTicket: AgentWriteTicket?
+    var parkedAgentSave: ParkedSave?
 
     /// A note that has been asked for but not yet written — no file, no name, no state entry.
     ///
@@ -192,6 +196,7 @@ public final class NoteSession {
         // time, and the shape is decisions 56 and 74's exactly: something replacing or moving the
         // buffer without putting what was in it somewhere first.
         if filename != currentFilename { flush(trigger: .noteSwitched) }
+        parkDeferredSaveIfAgentWriting()
 
         // Explicitly opening a note resets traversal only after it has loaded successfully. Failed
         // opens and external reloads must not reorder the list underneath repeated Previous/Next.
@@ -239,6 +244,7 @@ public final class NoteSession {
 
     /// An empty panel pointing at nothing, ready to be typed into.
     private func beginDraft() {
+        parkDeferredSaveIfAgentWriting()
         currentFilename = nil
         bufferText = ""
         baselineHash = nil
@@ -532,8 +538,8 @@ public final class NoteSession {
                 // The panel may have moved on while the move was on the queue.
                 guard self.currentFilename == filename else { return }
                 self.repoint(from: filename, to: newName)
-                // Still unsettled: the title can go on changing, and so can the name.
-                self.unsettledName = newName
+                // Still unsettled — unless something settled it while the move was on the queue.
+                if self.unsettledName == filename { self.unsettledName = newName }
             }
         }
     }
