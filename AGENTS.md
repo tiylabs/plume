@@ -43,7 +43,7 @@ A new file goes in the folder named for what it is about, not for who calls it.
 ```bash
 make help       # list all targets
 make test-all   # EVERY suite: PlumeKit + editor typecheck + keyboard tables + theme contract
-                # + WKWebView suites. This is what CI and the release workflow run.
+                # + native Settings layouts + WKWebView suites. This is what CI and the release workflow run.
 make test       # just the PlumeKit suite (pure Foundation, no Node needed)
 make lint       # editor typecheck + doc-refs check + SwiftLint (if installed)
 make dev        # rebuild and launch the isolated build/Plume Dev.app (release app keeps running)
@@ -69,6 +69,8 @@ a new suite is added there, not to CI configs):
 
 - Swift logic → `Scripts/test.sh` (PlumeKit suite; includes on-disk format compatibility and the
   Swift ⇄ web bridge contract).
+- Native Settings layout → `Scripts/test-settings.sh` (real AppKit display cycles, storage transitions
+  and explanation wrapping; included in `make test-all`).
 - Editor/TypeScript → `cd Editor && npm run typecheck` plus the relevant suites:
   keyboard tables (`Scripts/test-keyboard.sh`), theme contract (`node tests/theme-contract.mjs`),
   and the WKWebView suites (`Scripts/test-web.sh`) which run the real bundle in a real WKWebView —

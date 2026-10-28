@@ -12,6 +12,9 @@ final class SettingsRow: NSView {
     /// The row's title, for the one row that changes its mind about what it is called.
     let titleLabel: NSTextField
 
+    /// Kept separately so wrapping can use the control's fitted width, not the label's last frame.
+    private var rowControl: NSView?
+
     init(title: String, explanation: String? = nil, control: NSView? = nil) {
         let titleLabel = NSTextField(labelWithString: title)
         self.titleLabel = titleLabel
@@ -51,6 +54,7 @@ final class SettingsRow: NSView {
             text.topAnchor.constraint(greaterThanOrEqualTo: line.topAnchor),
             text.bottomAnchor.constraint(lessThanOrEqualTo: line.bottomAnchor),
         ]
+        rowControl = control
         if let control {
             control.translatesAutoresizingMaskIntoConstraints = false
             control.setContentHuggingPriority(.required, for: .horizontal)
@@ -91,19 +95,21 @@ final class SettingsRow: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    /// Wraps the explanation at the width it actually got.
+    /// Measures wrapping against the space available beside the control, capped at 280 points.
     ///
-    /// `explanationWidth` is the most it may take, but a wide control takes some of it. The MCP
-    /// tab's access pop-up, when its longest option was "Read, create and change notes", left the
-    /// English explanation narrower than 280; the label still measured its height at 280 — two
-    /// lines — and the third was cut off. Re-measuring at the real width gives any row the lines it
-    /// needs, whatever control sits beside it.
+    /// The MCP access pop-up can leave less than 280 points for its explanation; measuring at 280
+    /// clipped the third line. But measuring the label's own frame feeds its new intrinsic size back
+    /// into the next measurement: Storage's iCloud explanation and Git status row oscillated between
+    /// widths until AppKit threw an update-constraints-loop exception. Use the row's inner width minus
+    /// the control's fitting width, which does not depend on the explanation's intrinsic size. Hidden
+    /// Git cards have no useful layout allocation and must wait until they are shown before measuring.
     override func layout() {
         super.layout()
-        let width = explanationLabel.frame.width
-        guard !explanationLabel.isHidden, width > 0,
-              abs(explanationLabel.preferredMaxLayoutWidth - width) > 0.5 else { return }
-        explanationLabel.preferredMaxLayoutWidth = min(width, SettingsForm.explanationWidth)
+        guard !explanationLabel.isHiddenOrHasHiddenAncestor, explanationLabel.superview != nil else { return }
+        let controlWidth = rowControl.map { $0.fittingSize.width + SettingsForm.rowSpacing } ?? 0
+        let width = min(bounds.width - 2 * SettingsForm.rowInset - controlWidth, SettingsForm.explanationWidth)
+        guard width > 0, abs(explanationLabel.preferredMaxLayoutWidth - width) > 0.5 else { return }
+        explanationLabel.preferredMaxLayoutWidth = width
         explanationLabel.invalidateIntrinsicContentSize()
         needsLayout = true
     }
