@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > are recorded in its history, not in this file. The entries below cover this fork only. The project was renamed from Pane to Plume after v0.3.1075;
 > the older entries and their links still use the former name and repository path `tiylabs/pane`.
 
+## [v0.6.2] - 2026-10-28
+### :bug: Bug Fixes
+- [`16ea775`](https://github.com/tiylabs/plume/commit/16ea7755fc68ff844b29a7505711d32d8fa533c2) - **settings**: 🐛 Prevent Storage layout crashes *(commit by [@jorben](https://github.com/jorben))*
+
+
 ## [v0.6.1] - 2026-10-18
 ### :sparkles: New Features
 - [`70759dc`](https://github.com/tiylabs/plume/commit/70759dc3d97b8e249d8790ce0115416d94fb7398) - **agent**: ✨ Connect your own AI agent through a local MCP helper *(PR [#11](https://github.com/tiylabs/plume/pull/11) by [@jorben](https://github.com/jorben))*
@@ -72,3 +77,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.5.0]: https://github.com/tiylabs/plume/compare/v0.4.1075...v0.5.0
 [v0.6.0]: https://github.com/tiylabs/plume/compare/v0.5.0...v0.6.0
 [v0.6.1]: https://github.com/tiylabs/plume/compare/v0.6.0...v0.6.1
+[v0.6.2]: https://github.com/tiylabs/plume/compare/v0.6.1...v0.6.2
